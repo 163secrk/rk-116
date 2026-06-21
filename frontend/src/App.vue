@@ -107,24 +107,20 @@ function handleSelect(id) {
 }
 
 function handleUpdateList(list) {
-  schemaList.value = list
+  schemaList.value = [...list]
 }
 
 function handleRemove(id) {
-  const index = schemaList.value.findIndex(item => item.id === id)
-  if (index > -1) {
-    schemaList.value.splice(index, 1)
-    if (selectedId.value === id) {
-      selectedId.value = null
-    }
+  schemaList.value = schemaList.value.filter(item => item.id !== id)
+  if (selectedId.value === id) {
+    selectedId.value = null
   }
 }
 
 function handleUpdateComponent(updated) {
-  const index = schemaList.value.findIndex(item => item.id === updated.id)
-  if (index > -1) {
-    schemaList.value[index] = { ...schemaList.value[index], ...updated }
-  }
+  schemaList.value = schemaList.value.map(item =>
+    item.id === updated.id ? { ...item, ...updated } : item
+  )
 }
 
 async function handleSave() {

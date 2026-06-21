@@ -22,6 +22,7 @@
         ghost-class="ghost"
         chosen-class="chosen"
         animation="200"
+        @change="onDraggableChange"
       >
         <template #item="{ element, index }">
           <div
@@ -58,7 +59,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 import { NIcon, NButton } from 'naive-ui'
 import draggable from 'vuedraggable'
 import {
@@ -83,14 +84,27 @@ const props = defineProps({
 const emit = defineEmits(['select-component', 'update-list', 'remove-component'])
 
 const list = ref([...props.schemaList])
+let isInternalChange = false
 
-watch(() => props.schemaList, (val) => {
-  list.value = [...val]
-}, { deep: true })
+watch(() => props.schemaList, (newVal) => {
+  if (isInternalChange) {
+    isInternalChange = false
+    return
+  }
+  list.value = JSON.parse(JSON.stringify(newVal))
+}, { deep: false })
 
-watch(list, (val) => {
-  emit('update-list', [...val])
-}, { deep: true })
+function syncToParent() {
+  isInternalChange = true
+  emit('update-list', JSON.parse(JSON.stringify(list.value)))
+  nextTick(() => {
+    isInternalChange = false
+  })
+}
+
+function onDraggableChange() {
+  syncToParent()
+}
 
 const typeNameMap = {
   input: '输入框',
@@ -125,6 +139,7 @@ function handleDrop(event) {
         required: false
       }
       list.value.push(newItem)
+      syncToParent()
       emit('select-component', newItem.id)
     }
   } catch (e) {

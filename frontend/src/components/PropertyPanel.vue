@@ -14,16 +14,34 @@
           <div class="section-title">基本属性</div>
           <n-form label-placement="left" label-width="80px">
             <n-form-item label="标签">
-              <n-input v-model:value="localComp.label" placeholder="请输入标签" size="small" />
+              <n-input
+                :value="localComp.label"
+                @update:value="val => updateField('label', val)"
+                placeholder="请输入标签"
+                size="small"
+              />
             </n-form-item>
             <n-form-item label="字段名">
-              <n-input v-model:value="localComp.field" placeholder="请输入字段名" size="small" />
+              <n-input
+                :value="localComp.field"
+                @update:value="val => updateField('field', val)"
+                placeholder="请输入字段名"
+                size="small"
+              />
             </n-form-item>
             <n-form-item v-if="hasPlaceholder" label="占位符">
-              <n-input v-model:value="localComp.placeholder" placeholder="请输入占位符" size="small" />
+              <n-input
+                :value="localComp.placeholder"
+                @update:value="val => updateField('placeholder', val)"
+                placeholder="请输入占位符"
+                size="small"
+              />
             </n-form-item>
             <n-form-item label="必填">
-              <n-switch v-model:value="localComp.required" />
+              <n-switch
+                :value="localComp.required"
+                @update:value="val => updateField('required', val)"
+              />
             </n-form-item>
           </n-form>
         </div>
@@ -45,13 +63,15 @@
               class="option-item"
             >
               <n-input
-                v-model:value="opt.label"
+                :value="opt.label"
+                @update:value="val => updateOption(idx, 'label', val)"
                 placeholder="标签"
                 size="small"
                 style="flex: 1; margin-right: 8px"
               />
               <n-input
-                v-model:value="opt.value"
+                :value="opt.value"
+                @update:value="val => updateOption(idx, 'value', val)"
                 placeholder="值"
                 size="small"
                 style="flex: 1; margin-right: 8px"
@@ -85,24 +105,50 @@ const emit = defineEmits(['update-component'])
 
 const localComp = ref({
   id: null,
+  type: '',
   label: '',
   field: '',
   placeholder: '',
   options: [],
   required: false
 })
+let currentId = null
 
 watch(() => props.selectedComponent, (val) => {
-  if (val) {
-    localComp.value = JSON.parse(JSON.stringify(val))
+  const newId = val ? val.id : null
+  if (newId !== currentId) {
+    currentId = newId
+    if (val) {
+      localComp.value = JSON.parse(JSON.stringify(val))
+    } else {
+      localComp.value = {
+        id: null,
+        type: '',
+        label: '',
+        field: '',
+        placeholder: '',
+        options: [],
+        required: false
+      }
+    }
   }
-}, { immediate: true, deep: true })
+}, { immediate: true })
 
-watch(localComp, (val) => {
-  if (val.id && props.selectedComponent) {
-    emit('update-component', JSON.parse(JSON.stringify(val)))
+function emitUpdate() {
+  if (localComp.value.id) {
+    emit('update-component', JSON.parse(JSON.stringify(localComp.value)))
   }
-}, { deep: true })
+}
+
+function updateField(key, value) {
+  localComp.value[key] = value
+  emitUpdate()
+}
+
+function updateOption(idx, key, value) {
+  localComp.value.options[idx][key] = value
+  emitUpdate()
+}
 
 const hasPlaceholder = computed(() => {
   return ['input', 'textarea', 'select', 'date', 'time'].includes(localComp.value.type)
@@ -117,10 +163,12 @@ function addOption() {
     label: '选项' + (localComp.value.options.length + 1),
     value: 'option' + (localComp.value.options.length + 1)
   })
+  emitUpdate()
 }
 
 function removeOption(idx) {
   localComp.value.options.splice(idx, 1)
+  emitUpdate()
 }
 </script>
 
