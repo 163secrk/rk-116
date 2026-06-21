@@ -96,7 +96,21 @@ function handleAddComponent(component) {
     field: component.field,
     placeholder: component.placeholder || '',
     options: component.options ? JSON.parse(JSON.stringify(component.options)) : [],
-    required: false
+    required: false,
+    validation: {
+      required: false,
+      requiredMessage: '该项为必填项',
+      minLength: null,
+      maxLength: null,
+      minLengthMessage: '长度不能小于最小值',
+      maxLengthMessage: '长度不能大于最大值',
+      pattern: null,
+      patternMessage: '格式不正确',
+      min: null,
+      max: null,
+      minMessage: '数值不能小于最小值',
+      maxMessage: '数值不能大于最大值'
+    }
   }
   schemaList.value.push(newItem)
   selectedId.value = newItem.id
@@ -144,6 +158,26 @@ async function handleSave() {
   }
 }
 
+function ensureValidation(item) {
+  if (!item.validation) {
+    item.validation = {
+      required: false,
+      requiredMessage: '该项为必填项',
+      minLength: null,
+      maxLength: null,
+      minLengthMessage: '长度不能小于最小值',
+      maxLengthMessage: '长度不能大于最大值',
+      pattern: null,
+      patternMessage: '格式不正确',
+      min: null,
+      max: null,
+      minMessage: '数值不能小于最小值',
+      maxMessage: '数值不能大于最大值'
+    }
+  }
+  return item
+}
+
 onMounted(async () => {
   try {
     const res = await axios.get('/api/forms')
@@ -151,7 +185,8 @@ onMounted(async () => {
       const latest = res.data.data[res.data.data.length - 1]
       formName.value = latest.name
       try {
-        schemaList.value = JSON.parse(latest.schemaData) || []
+        const list = JSON.parse(latest.schemaData) || []
+        schemaList.value = list.map(item => ensureValidation(item))
       } catch (e) {
         schemaList.value = []
       }

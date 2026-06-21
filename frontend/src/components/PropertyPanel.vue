@@ -84,6 +84,147 @@
             </div>
           </div>
         </div>
+
+        <div class="property-section">
+          <div class="section-title">校验规则</div>
+          <n-form label-placement="left" label-width="80px">
+            <div class="validation-item">
+              <div class="validation-header">
+                <n-switch
+                  :value="localComp.validation.required"
+                  @update:value="val => updateValidation('required', val)"
+                />
+                <span class="validation-label">必填校验</span>
+              </div>
+              <n-form-item v-if="localComp.validation.required" label="提示">
+                <n-input
+                  :value="localComp.validation.requiredMessage"
+                  @update:value="val => updateValidation('requiredMessage', val)"
+                  placeholder="必填提示文字"
+                  size="small"
+                />
+              </n-form-item>
+            </div>
+
+            <div class="validation-item">
+              <div class="validation-header">
+                <n-switch
+                  :value="hasLengthValidation"
+                  @update:value="toggleLengthValidation"
+                />
+                <span class="validation-label">长度校验</span>
+              </div>
+              <div v-if="hasLengthValidation" class="validation-body">
+                <n-form-item label="最小长度">
+                  <n-input-number
+                    :value="localComp.validation.minLength"
+                    @update:value="val => updateValidation('minLength', val)"
+                    :min="0"
+                    size="small"
+                    style="width: 100%"
+                  />
+                </n-form-item>
+                <n-form-item label="最大长度">
+                  <n-input-number
+                    :value="localComp.validation.maxLength"
+                    @update:value="val => updateValidation('maxLength', val)"
+                    :min="0"
+                    size="small"
+                    style="width: 100%"
+                  />
+                </n-form-item>
+                <n-form-item label="提示文字">
+                  <n-input
+                    :value="localComp.validation.minLengthMessage"
+                    @update:value="val => updateValidation('minLengthMessage', val)"
+                    placeholder="最小长度提示"
+                    size="small"
+                  />
+                </n-form-item>
+                <n-form-item label="">
+                  <n-input
+                    :value="localComp.validation.maxLengthMessage"
+                    @update:value="val => updateValidation('maxLengthMessage', val)"
+                    placeholder="最大长度提示"
+                    size="small"
+                  />
+                </n-form-item>
+              </div>
+            </div>
+
+            <div v-if="supportsPattern" class="validation-item">
+              <div class="validation-header">
+                <n-switch
+                  :value="hasPatternValidation"
+                  @update:value="togglePatternValidation"
+                />
+                <span class="validation-label">正则表达式</span>
+              </div>
+              <div v-if="hasPatternValidation" class="validation-body">
+                <n-form-item label="表达式">
+                  <n-input
+                    :value="localComp.validation.pattern"
+                    @update:value="val => updateValidation('pattern', val)"
+                    placeholder="例如: ^[a-zA-Z]+$"
+                    size="small"
+                  />
+                </n-form-item>
+                <n-form-item label="提示文字">
+                  <n-input
+                    :value="localComp.validation.patternMessage"
+                    @update:value="val => updateValidation('patternMessage', val)"
+                    placeholder="正则校验提示"
+                    size="small"
+                  />
+                </n-form-item>
+              </div>
+            </div>
+
+            <div v-if="supportsNumberRange" class="validation-item">
+              <div class="validation-header">
+                <n-switch
+                  :value="hasNumberValidation"
+                  @update:value="toggleNumberValidation"
+                />
+                <span class="validation-label">数字范围</span>
+              </div>
+              <div v-if="hasNumberValidation" class="validation-body">
+                <n-form-item label="最小值">
+                  <n-input-number
+                    :value="localComp.validation.min"
+                    @update:value="val => updateValidation('min', val)"
+                    size="small"
+                    style="width: 100%"
+                  />
+                </n-form-item>
+                <n-form-item label="最大值">
+                  <n-input-number
+                    :value="localComp.validation.max"
+                    @update:value="val => updateValidation('max', val)"
+                    size="small"
+                    style="width: 100%"
+                  />
+                </n-form-item>
+                <n-form-item label="提示文字">
+                  <n-input
+                    :value="localComp.validation.minMessage"
+                    @update:value="val => updateValidation('minMessage', val)"
+                    placeholder="最小值提示"
+                    size="small"
+                  />
+                </n-form-item>
+                <n-form-item label="">
+                  <n-input
+                    :value="localComp.validation.maxMessage"
+                    @update:value="val => updateValidation('maxMessage', val)"
+                    placeholder="最大值提示"
+                    size="small"
+                  />
+                </n-form-item>
+              </div>
+            </div>
+          </n-form>
+        </div>
       </div>
     </div>
   </aside>
@@ -91,7 +232,7 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
-import { NIcon, NForm, NFormItem, NInput, NSwitch, NButton } from 'naive-ui'
+import { NIcon, NForm, NFormItem, NInput, NSwitch, NButton, NInputNumber } from 'naive-ui'
 import { SettingsOutline, HandRightOutline, AddOutline, TrashOutline } from '@vicons/ionicons5'
 
 const props = defineProps({
@@ -103,33 +244,54 @@ const props = defineProps({
 
 const emit = defineEmits(['update-component'])
 
-const localComp = ref({
-  id: null,
-  type: '',
-  label: '',
-  field: '',
-  placeholder: '',
-  options: [],
-  required: false
-})
+function getDefaultValidation() {
+  return {
+    required: false,
+    requiredMessage: '该项为必填项',
+    minLength: null,
+    maxLength: null,
+    minLengthMessage: '长度不能小于最小值',
+    maxLengthMessage: '长度不能大于最大值',
+    pattern: null,
+    patternMessage: '格式不正确',
+    min: null,
+    max: null,
+    minMessage: '数值不能小于最小值',
+    maxMessage: '数值不能大于最大值'
+  }
+}
+
+function getDefaultLocalComp() {
+  return {
+    id: null,
+    type: '',
+    label: '',
+    field: '',
+    placeholder: '',
+    options: [],
+    required: false,
+    validation: getDefaultValidation()
+  }
+}
+
+const localComp = ref(getDefaultLocalComp())
 let currentId = null
+
+function ensureValidation(comp) {
+  if (!comp.validation) {
+    comp.validation = getDefaultValidation()
+  }
+  return comp
+}
 
 watch(() => props.selectedComponent, (val) => {
   const newId = val ? val.id : null
   if (newId !== currentId) {
     currentId = newId
     if (val) {
-      localComp.value = JSON.parse(JSON.stringify(val))
+      localComp.value = ensureValidation(JSON.parse(JSON.stringify(val)))
     } else {
-      localComp.value = {
-        id: null,
-        type: '',
-        label: '',
-        field: '',
-        placeholder: '',
-        options: [],
-        required: false
-      }
+      localComp.value = getDefaultLocalComp()
     }
   }
 }, { immediate: true })
@@ -142,6 +304,17 @@ function emitUpdate() {
 
 function updateField(key, value) {
   localComp.value[key] = value
+  if (key === 'required') {
+    localComp.value.validation.required = value
+  }
+  emitUpdate()
+}
+
+function updateValidation(key, value) {
+  localComp.value.validation[key] = value
+  if (key === 'required') {
+    localComp.value.required = value
+  }
   emitUpdate()
 }
 
@@ -157,6 +330,67 @@ const hasPlaceholder = computed(() => {
 const hasOptions = computed(() => {
   return ['select', 'radio', 'checkbox'].includes(localComp.value.type)
 })
+
+const supportsPattern = computed(() => {
+  return ['input', 'textarea'].includes(localComp.value.type)
+})
+
+const supportsNumberRange = computed(() => {
+  return ['input'].includes(localComp.value.type)
+})
+
+const hasLengthValidation = computed(() => {
+  return localComp.value.validation.minLength !== null || localComp.value.validation.maxLength !== null
+})
+
+const hasPatternValidation = computed(() => {
+  return localComp.value.validation.pattern !== null && localComp.value.validation.pattern !== undefined
+})
+
+const hasNumberValidation = computed(() => {
+  return localComp.value.validation.min !== null || localComp.value.validation.max !== null
+})
+
+function toggleLengthValidation(enabled) {
+  if (enabled) {
+    if (localComp.value.validation.minLength === null) {
+      localComp.value.validation.minLength = 0
+    }
+    if (localComp.value.validation.maxLength === null) {
+      localComp.value.validation.maxLength = 100
+    }
+  } else {
+    localComp.value.validation.minLength = null
+    localComp.value.validation.maxLength = null
+  }
+  emitUpdate()
+}
+
+function togglePatternValidation(enabled) {
+  if (enabled) {
+    if (localComp.value.validation.pattern === null || localComp.value.validation.pattern === undefined) {
+      localComp.value.validation.pattern = ''
+    }
+  } else {
+    localComp.value.validation.pattern = null
+  }
+  emitUpdate()
+}
+
+function toggleNumberValidation(enabled) {
+  if (enabled) {
+    if (localComp.value.validation.min === null) {
+      localComp.value.validation.min = 0
+    }
+    if (localComp.value.validation.max === null) {
+      localComp.value.validation.max = 100
+    }
+  } else {
+    localComp.value.validation.min = null
+    localComp.value.validation.max = null
+  }
+  emitUpdate()
+}
 
 function addOption() {
   localComp.value.options.push({
@@ -245,5 +479,40 @@ function removeOption(idx) {
 .option-item {
   display: flex;
   align-items: center;
+}
+
+.validation-item {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 8px;
+}
+
+.validation-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 0;
+}
+
+.validation-label {
+  font-size: 13px;
+  color: #cbd5e1;
+  font-weight: 500;
+}
+
+.validation-body {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #334155;
+}
+
+.validation-body :deep(.n-form-item) {
+  margin-bottom: 10px;
+}
+
+.validation-body :deep(.n-form-item:last-child) {
+  margin-bottom: 0;
 }
 </style>

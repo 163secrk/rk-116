@@ -2,7 +2,7 @@
   <div class="form-item">
     <label class="form-label">
       {{ component.label || '未命名' }}
-      <span v-if="component.required" class="required">*</span>
+      <span v-if="component.validation?.required || component.required" class="required">*</span>
     </label>
     <div class="form-control">
       <n-input

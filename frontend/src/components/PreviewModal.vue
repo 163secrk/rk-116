@@ -5,13 +5,23 @@
         <n-icon size="40"><AlertCircleOutline /></n-icon>
         <p>暂无表单内容，请先添加组件</p>
       </div>
-      <n-form v-else :model="formData" label-placement="left" label-width="100px">
-        <div v-for="comp in schemaList" :key="comp.id" class="preview-item">
-          <n-form-item :label="comp.label" :required="comp.required">
+      <div v-else class="form-list">
+        <div v-for="comp in schemaList" :key="comp.id" class="form-item-wrap">
+          <div class="form-label-wrap">
+            <span class="form-label">{{ comp.label }}</span>
+            <span v-if="comp.validation?.required" class="required-mark">*</span>
+          </div>
+          <div
+            class="form-control-wrap"
+            :class="{ 'has-error': showError(comp.field) }"
+          >
             <n-input
               v-if="comp.type === 'input'"
               v-model:value="formData[comp.field]"
               :placeholder="comp.placeholder"
+              @blur="handleFieldBlur(comp.field)"
+              @update:value="handleFieldChange(comp.field)"
+              :status="getFieldStatus(comp.field)"
             />
             <n-input
               v-else-if="comp.type === 'textarea'"
@@ -19,21 +29,35 @@
               type="textarea"
               :placeholder="comp.placeholder"
               :rows="3"
+              @blur="handleFieldBlur(comp.field)"
+              @update:value="handleFieldChange(comp.field)"
+              :status="getFieldStatus(comp.field)"
             />
             <n-select
               v-else-if="comp.type === 'select'"
               v-model:value="formData[comp.field]"
               :options="comp.options"
               :placeholder="comp.placeholder"
+              @blur="handleFieldBlur(comp.field)"
+              @update:value="handleFieldChange(comp.field)"
+              :status="getFieldStatus(comp.field)"
             />
-            <n-radio-group v-else-if="comp.type === 'radio'" v-model:value="formData[comp.field]">
+            <n-radio-group
+              v-else-if="comp.type === 'radio'"
+              v-model:value="formData[comp.field]"
+              @update:value="handleFieldChange(comp.field)"
+            >
               <n-space>
                 <n-radio v-for="opt in comp.options" :key="opt.value" :value="opt.value">
                   {{ opt.label }}
                 </n-radio>
               </n-space>
             </n-radio-group>
-            <n-checkbox-group v-else-if="comp.type === 'checkbox'" v-model:value="formData[comp.field]">
+            <n-checkbox-group
+              v-else-if="comp.type === 'checkbox'"
+              v-model:value="formData[comp.field]"
+              @update:value="handleFieldChange(comp.field)"
+            >
               <n-space>
                 <n-checkbox v-for="opt in comp.options" :key="opt.value" :value="opt.value">
                   {{ opt.label }}
@@ -44,14 +68,21 @@
               v-else-if="comp.type === 'date'"
               v-model:value="formData[comp.field]"
               type="date"
+              @blur="handleFieldBlur(comp.field)"
+              @update:value="handleFieldChange(comp.field)"
             />
             <n-time-picker
               v-else-if="comp.type === 'time'"
               v-model:value="formData[comp.field]"
+              @blur="handleFieldBlur(comp.field)"
+              @update:value="handleFieldChange(comp.field)"
             />
-          </n-form-item>
+          </div>
+          <div v-if="showError(comp.field)" class="error-tip">
+            {{ fieldErrors[comp.field][0] }}
+          </div>
         </div>
-      </n-form>
+      </div>
     </div>
     <template #footer>
       <div class="preview-footer">
@@ -66,8 +97,9 @@
 
 <script setup>
 import { ref, watch, reactive, computed } from 'vue'
-import { NModal, NForm, NFormItem, NInput, NSelect, NRadioGroup, NRadio, NCheckboxGroup, NCheckbox, NSpace, NButton, NIcon, createDiscreteApi } from 'naive-ui'
+import { NModal, NInput, NSelect, NRadioGroup, NRadio, NCheckboxGroup, NCheckbox, NSpace, NButton, NIcon, createDiscreteApi } from 'naive-ui'
 import { AlertCircleOutline } from '@vicons/ionicons5'
+import { validateField, validateForm } from '../utils/validation.js'
 
 const props = defineProps({
   show: {
@@ -93,21 +125,93 @@ const showModal = computed({
 })
 
 const formData = reactive({})
+const fieldErrors = reactive({})
+const touchedFields = reactive({})
+const submitted = ref(false)
 
 watch(() => props.schemaList, (list) => {
   Object.keys(formData).forEach(key => delete formData[key])
+  Object.keys(fieldErrors).forEach(key => delete fieldErrors[key])
+  Object.keys(touchedFields).forEach(key => delete touchedFields[key])
+  submitted.value = false
   list.forEach(item => {
     if (item.type === 'checkbox') {
       formData[item.field] = []
     } else {
       formData[item.field] = null
     }
+    fieldErrors[item.field] = []
+    touchedFields[item.field] = false
   })
 }, { immediate: true, deep: true })
 
+watch(() => props.show, (val) => {
+  if (val) {
+    submitted.value = false
+    Object.keys(touchedFields).forEach(key => {
+      touchedFields[key] = false
+    })
+    validateAllFields()
+  }
+})
+
+function getSchemaByField(field) {
+  return props.schemaList.find(item => item.field === field)
+}
+
+function validateOneField(field) {
+  const schema = getSchemaByField(field)
+  if (!schema) return
+  const result = validateField(formData[field], schema)
+  fieldErrors[field] = result.errors
+}
+
+function validateAllFields() {
+  props.schemaList.forEach(schema => {
+    validateOneField(schema.field)
+  })
+}
+
+function handleFieldBlur(field) {
+  touchedFields[field] = true
+  validateOneField(field)
+}
+
+function handleFieldChange(field) {
+  if (touchedFields[field] || submitted.value) {
+    validateOneField(field)
+  }
+}
+
+function showError(field) {
+  const hasError = fieldErrors[field] && fieldErrors[field].length > 0
+  return hasError && (touchedFields[field] || submitted.value)
+}
+
+function getFieldStatus(field) {
+  if (showError(field)) {
+    return 'error'
+  }
+  return null
+}
+
 function handleSubmit() {
-  console.log('表单数据:', formData)
-  message.success('表单提交成功！请查看控制台输出')
+  submitted.value = true
+  validateAllFields()
+  const result = validateForm(formData, props.schemaList)
+  if (result.valid) {
+    console.log('表单数据:', formData)
+    message.success('表单提交成功！请查看控制台输出')
+  } else {
+    message.error('请检查表单填写是否正确')
+    const firstErrorField = props.schemaList.find(schema => {
+      const r = validateField(formData[schema.field], schema)
+      return !r.valid
+    })
+    if (firstErrorField) {
+      touchedFields[firstErrorField.field] = true
+    }
+  }
 }
 </script>
 
@@ -130,8 +234,44 @@ function handleSubmit() {
   font-size: 14px;
 }
 
-.preview-item {
-  margin-bottom: 4px;
+.form-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-item-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label-wrap {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.form-label {
+  font-size: 13px;
+  color: #334155;
+  font-weight: 500;
+}
+
+.required-mark {
+  color: #ef4444;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.form-control-wrap {
+  width: 100%;
+}
+
+.error-tip {
+  font-size: 12px;
+  color: #ef4444;
+  line-height: 1.4;
 }
 
 .preview-footer {
