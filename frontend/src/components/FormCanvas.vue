@@ -113,7 +113,10 @@ const typeNameMap = {
   radio: '单选框',
   checkbox: '多选框',
   date: '日期',
-  time: '时间'
+  time: '时间',
+  rating: '评分',
+  upload: '文件上传',
+  switch: '开关'
 }
 
 function getTypeName(type) {
@@ -136,7 +139,25 @@ function handleDrop(event) {
         field: comp.field + Date.now().toString().slice(-4),
         placeholder: comp.placeholder || '',
         options: comp.options ? JSON.parse(JSON.stringify(comp.options)) : [],
-        required: false
+        required: false,
+        maxStars: comp.maxStars || 5,
+        acceptTypes: comp.acceptTypes ? JSON.parse(JSON.stringify(comp.acceptTypes)) : [],
+        maxSize: comp.maxSize || 10,
+        defaultValue: comp.defaultValue !== undefined ? comp.defaultValue : false,
+        validation: {
+          required: false,
+          requiredMessage: '该项为必填项',
+          minLength: null,
+          maxLength: null,
+          minLengthMessage: '长度不能小于最小值',
+          maxLengthMessage: '长度不能大于最大值',
+          pattern: null,
+          patternMessage: '格式不正确',
+          min: null,
+          max: null,
+          minMessage: '数值不能小于最小值',
+          maxMessage: '数值不能大于最大值'
+        }
       }
       list.value.push(newItem)
       syncToParent()

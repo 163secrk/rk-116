@@ -37,7 +37,10 @@ import {
   RadioButtonOnOutline,
   DocumentTextOutline,
   CalendarOutline,
-  TimeOutline
+  TimeOutline,
+  StarOutline,
+  CloudUploadOutline,
+  ToggleOutline
 } from '@vicons/ionicons5'
 
 const emit = defineEmits(['add-component'])
@@ -101,6 +104,28 @@ const componentList = [
     field: 'time_',
     placeholder: '请选择时间',
     icon: TimeOutline
+  },
+  {
+    type: 'rating',
+    label: '评分',
+    field: 'rating_',
+    icon: StarOutline,
+    maxStars: 5
+  },
+  {
+    type: 'upload',
+    label: '文件上传',
+    field: 'upload_',
+    icon: CloudUploadOutline,
+    acceptTypes: ['image/*', 'application/pdf', '.doc', '.docx'],
+    maxSize: 10
+  },
+  {
+    type: 'switch',
+    label: '开关',
+    field: 'switch_',
+    icon: ToggleOutline,
+    defaultValue: false
   }
 ]
 

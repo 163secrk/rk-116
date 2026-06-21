@@ -37,10 +37,77 @@
                 size="small"
               />
             </n-form-item>
-            <n-form-item label="必填">
+          </n-form>
+        </div>
+
+        <div v-if="isRatingType" class="property-section">
+          <div class="section-title">评分配置</div>
+          <n-form label-placement="left" label-width="80px">
+            <n-form-item label="最大星数">
+              <n-input-number
+                :value="localComp.maxStars"
+                @update:value="val => updateField('maxStars', val)"
+                :min="1"
+                :max="10"
+                size="small"
+                style="width: 100%"
+              />
+            </n-form-item>
+          </n-form>
+        </div>
+
+        <div v-if="isUploadType" class="property-section">
+          <div class="section-title">
+            <span>上传配置</span>
+          </div>
+          <n-form label-placement="left" label-width="80px">
+            <n-form-item label="大小限制">
+              <n-input-number
+                :value="localComp.maxSize"
+                @update:value="val => updateField('maxSize', val)"
+                :min="1"
+                size="small"
+                style="width: 100%"
+              />
+              <span class="form-item-suffix">MB</span>
+            </n-form-item>
+          </n-form>
+          <div class="section-sub-title">支持的文件类型</div>
+          <div class="options-list">
+            <div
+              v-for="(type, idx) in localComp.acceptTypes"
+              :key="idx"
+              class="option-item"
+            >
+              <n-input
+                :value="type"
+                @update:value="val => updateAcceptType(idx, val)"
+                placeholder="例如: image/* 或 .pdf"
+                size="small"
+                style="flex: 1; margin-right: 8px"
+              />
+              <n-button text size="tiny" type="error" @click="removeAcceptType(idx)">
+                <template #icon>
+                  <n-icon size="16"><TrashOutline /></n-icon>
+                </template>
+              </n-button>
+            </div>
+          </div>
+          <n-button text size="tiny" type="primary" @click="addAcceptType" style="margin-top: 8px">
+            <template #icon>
+              <n-icon><AddOutline /></n-icon>
+            </template>
+            添加文件类型
+          </n-button>
+        </div>
+
+        <div v-if="isSwitchType" class="property-section">
+          <div class="section-title">开关配置</div>
+          <n-form label-placement="left" label-width="80px">
+            <n-form-item label="默认值">
               <n-switch
-                :value="localComp.required"
-                @update:value="val => updateField('required', val)"
+                :value="localComp.defaultValue"
+                @update:value="val => updateField('defaultValue', val)"
               />
             </n-form-item>
           </n-form>
@@ -270,6 +337,10 @@ function getDefaultLocalComp() {
     placeholder: '',
     options: [],
     required: false,
+    maxStars: 5,
+    acceptTypes: [],
+    maxSize: 10,
+    defaultValue: false,
     validation: getDefaultValidation()
   }
 }
@@ -280,6 +351,20 @@ let currentId = null
 function ensureValidation(comp) {
   if (!comp.validation) {
     comp.validation = getDefaultValidation()
+  }
+  if (comp.type === 'rating' && comp.maxStars === undefined) {
+    comp.maxStars = 5
+  }
+  if (comp.type === 'upload') {
+    if (comp.acceptTypes === undefined) {
+      comp.acceptTypes = []
+    }
+    if (comp.maxSize === undefined) {
+      comp.maxSize = 10
+    }
+  }
+  if (comp.type === 'switch' && comp.defaultValue === undefined) {
+    comp.defaultValue = false
   }
   return comp
 }
@@ -304,17 +389,26 @@ function emitUpdate() {
 
 function updateField(key, value) {
   localComp.value[key] = value
-  if (key === 'required') {
-    localComp.value.validation.required = value
-  }
   emitUpdate()
 }
 
 function updateValidation(key, value) {
   localComp.value.validation[key] = value
-  if (key === 'required') {
-    localComp.value.required = value
-  }
+  emitUpdate()
+}
+
+function updateAcceptType(idx, value) {
+  localComp.value.acceptTypes.splice(idx, 1, value)
+  emitUpdate()
+}
+
+function addAcceptType() {
+  localComp.value.acceptTypes.push('')
+  emitUpdate()
+}
+
+function removeAcceptType(idx) {
+  localComp.value.acceptTypes.splice(idx, 1)
   emitUpdate()
 }
 
@@ -329,6 +423,18 @@ const hasPlaceholder = computed(() => {
 
 const hasOptions = computed(() => {
   return ['select', 'radio', 'checkbox'].includes(localComp.value.type)
+})
+
+const isRatingType = computed(() => {
+  return localComp.value.type === 'rating'
+})
+
+const isUploadType = computed(() => {
+  return localComp.value.type === 'upload'
+})
+
+const isSwitchType = computed(() => {
+  return localComp.value.type === 'switch'
 })
 
 const supportsPattern = computed(() => {
@@ -514,5 +620,26 @@ function removeOption(idx) {
 
 .validation-body :deep(.n-form-item:last-child) {
   margin-bottom: 0;
+}
+
+.section-sub-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: #94a3b8;
+  margin: 12px 0 8px 0;
+}
+
+.form-item-suffix {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+:deep(.n-form-item) {
+  position: relative;
 }
 </style>

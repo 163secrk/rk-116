@@ -77,6 +77,36 @@
               @blur="handleFieldBlur(comp.field)"
               @update:value="handleFieldChange(comp.field)"
             />
+            <n-rate
+              v-else-if="comp.type === 'rating'"
+              v-model:value="formData[comp.field]"
+              :count="comp.maxStars || 5"
+              @update:value="handleFieldChange(comp.field)"
+            />
+            <n-upload
+              v-else-if="comp.type === 'upload'"
+              v-model:file-list="uploadFileLists[comp.field]"
+              :accept="(comp.acceptTypes || []).join(',')"
+              :max="1"
+              @before-upload="(data) => handleBeforeUpload(comp, data)"
+            >
+              <n-button>
+                <template #icon>
+                  <n-icon><CloudUploadOutline /></n-icon>
+                </template>
+                上传文件
+              </n-button>
+              <template #tip>
+                <div class="preview-upload-tip">
+                  支持：{{ (comp.acceptTypes || []).join('、') }}，大小不超过 {{ comp.maxSize || 10 }}MB
+                </div>
+              </template>
+            </n-upload>
+            <n-switch
+              v-else-if="comp.type === 'switch'"
+              v-model:value="formData[comp.field]"
+              @update:value="handleFieldChange(comp.field)"
+            />
           </div>
           <div v-if="showError(comp.field)" class="error-tip">
             {{ fieldErrors[comp.field][0] }}
@@ -97,8 +127,8 @@
 
 <script setup>
 import { ref, watch, reactive, computed } from 'vue'
-import { NModal, NInput, NSelect, NRadioGroup, NRadio, NCheckboxGroup, NCheckbox, NSpace, NButton, NIcon, createDiscreteApi } from 'naive-ui'
-import { AlertCircleOutline } from '@vicons/ionicons5'
+import { NModal, NInput, NSelect, NRadioGroup, NRadio, NCheckboxGroup, NCheckbox, NSpace, NButton, NIcon, NRate, NUpload, NSwitch, createDiscreteApi } from 'naive-ui'
+import { AlertCircleOutline, CloudUploadOutline } from '@vicons/ionicons5'
 import { validateField, validateForm } from '../utils/validation.js'
 
 const props = defineProps({
@@ -127,16 +157,23 @@ const showModal = computed({
 const formData = reactive({})
 const fieldErrors = reactive({})
 const touchedFields = reactive({})
+const uploadFileLists = reactive({})
 const submitted = ref(false)
 
 watch(() => props.schemaList, (list) => {
   Object.keys(formData).forEach(key => delete formData[key])
   Object.keys(fieldErrors).forEach(key => delete fieldErrors[key])
   Object.keys(touchedFields).forEach(key => delete touchedFields[key])
+  Object.keys(uploadFileLists).forEach(key => delete uploadFileLists[key])
   submitted.value = false
   list.forEach(item => {
     if (item.type === 'checkbox') {
       formData[item.field] = []
+    } else if (item.type === 'switch') {
+      formData[item.field] = item.defaultValue !== undefined ? item.defaultValue : false
+    } else if (item.type === 'upload') {
+      formData[item.field] = null
+      uploadFileLists[item.field] = []
     } else {
       formData[item.field] = null
     }
@@ -193,6 +230,37 @@ function getFieldStatus(field) {
     return 'error'
   }
   return null
+}
+
+function handleBeforeUpload(comp, data) {
+  const file = data.file
+  const maxSizeMB = comp.maxSize || 10
+  if (file.file.size > maxSizeMB * 1024 * 1024) {
+    message.error(`文件大小不能超过 ${maxSizeMB}MB`)
+    return false
+  }
+  const acceptTypes = comp.acceptTypes || []
+  if (acceptTypes.length > 0) {
+    const fileName = file.name.toLowerCase()
+    const fileType = file.type ? file.type.toLowerCase() : ''
+    const matched = acceptTypes.some(accept => {
+      const a = accept.toLowerCase()
+      if (a.endsWith('/*')) {
+        return fileType.startsWith(a.replace('/*', '/'))
+      }
+      if (a.startsWith('.')) {
+        return fileName.endsWith(a)
+      }
+      return fileType === a || fileName.endsWith(a)
+    })
+    if (!matched) {
+      message.error('文件类型不支持')
+      return false
+    }
+  }
+  formData[comp.field] = file.name
+  handleFieldChange(comp.field)
+  return true
 }
 
 function handleSubmit() {
@@ -277,5 +345,11 @@ function handleSubmit() {
 .preview-footer {
   display: flex;
   justify-content: flex-end;
+}
+
+.preview-upload-tip {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
 }
 </style>

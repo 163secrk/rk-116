@@ -2,7 +2,7 @@
   <div class="form-item">
     <label class="form-label">
       {{ component.label || '未命名' }}
-      <span v-if="component.validation?.required || component.required" class="required">*</span>
+      <span v-if="component.validation?.required" class="required">*</span>
     </label>
     <div class="form-control">
       <n-input
@@ -51,12 +51,42 @@
         size="small"
         disabled
       />
+      <n-rate
+        v-else-if="component.type === 'rating'"
+        :count="component.maxStars || 5"
+        disabled
+      />
+      <n-upload
+        v-else-if="component.type === 'upload'"
+        :accept="(component.acceptTypes || []).join(',')"
+        :max="1"
+        disabled
+        trigger
+      >
+        <n-button size="small">
+          <template #icon>
+            <n-icon><CloudUploadOutline /></n-icon>
+          </template>
+          上传文件
+        </n-button>
+        <template #tip>
+          <div class="upload-tip">
+            支持：{{ (component.acceptTypes || []).join('、') }}，大小不超过 {{ component.maxSize || 10 }}MB
+          </div>
+        </template>
+      </n-upload>
+      <n-switch
+        v-else-if="component.type === 'switch'"
+        :value="component.defaultValue"
+        disabled
+      />
     </div>
   </div>
 </template>
 
 <script setup>
-import { NInput, NSelect, NRadioGroup, NRadio, NCheckboxGroup, NCheckbox, NSpace, NDatePicker, NTimePicker } from 'naive-ui'
+import { NInput, NSelect, NRadioGroup, NRadio, NCheckboxGroup, NCheckbox, NSpace, NDatePicker, NTimePicker, NRate,NUpload, NButton, NIcon, NSwitch } from 'naive-ui'
+import { CloudUploadOutline } from '@vicons/ionicons5'
 
 defineProps({
   component: {
@@ -86,5 +116,11 @@ defineProps({
 
 .form-control {
   width: 100%;
+}
+
+.upload-tip {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 4px;
 }
 </style>

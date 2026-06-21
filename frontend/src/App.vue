@@ -93,10 +93,14 @@ function handleAddComponent(component) {
     id: Date.now() + Math.random().toString(36).substr(2, 9),
     type: component.type,
     label: component.label,
-    field: component.field,
+    field: component.field + Date.now().toString().slice(-4),
     placeholder: component.placeholder || '',
     options: component.options ? JSON.parse(JSON.stringify(component.options)) : [],
     required: false,
+    maxStars: component.maxStars || 5,
+    acceptTypes: component.acceptTypes ? JSON.parse(JSON.stringify(component.acceptTypes)) : [],
+    maxSize: component.maxSize || 10,
+    defaultValue: component.defaultValue !== undefined ? component.defaultValue : false,
     validation: {
       required: false,
       requiredMessage: '该项为必填项',
@@ -113,7 +117,6 @@ function handleAddComponent(component) {
     }
   }
   schemaList.value.push(newItem)
-  selectedId.value = newItem.id
 }
 
 function handleSelect(id) {
@@ -174,6 +177,20 @@ function ensureValidation(item) {
       minMessage: '数值不能小于最小值',
       maxMessage: '数值不能大于最大值'
     }
+  }
+  if (item.type === 'rating' && item.maxStars === undefined) {
+    item.maxStars = 5
+  }
+  if (item.type === 'upload') {
+    if (item.acceptTypes === undefined) {
+      item.acceptTypes = []
+    }
+    if (item.maxSize === undefined) {
+      item.maxSize = 10
+    }
+  }
+  if (item.type === 'switch' && item.defaultValue === undefined) {
+    item.defaultValue = false
   }
   return item
 }
