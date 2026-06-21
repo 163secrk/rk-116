@@ -11,14 +11,12 @@
             <span class="form-label">{{ comp.label }}</span>
             <span v-if="comp.validation?.required" class="required-mark">*</span>
           </div>
-          <div
-            class="form-control-wrap"
-            :class="{ 'has-error': showError(comp.field) }"
-          >
+          <div class="form-control-wrap" :class="{ 'has-error': showError(comp.field) }">
             <n-input
               v-if="comp.type === 'input'"
               v-model:value="formData[comp.field]"
               :placeholder="comp.placeholder"
+              :disabled="comp.disabled"
               @blur="handleFieldBlur(comp.field)"
               @update:value="handleFieldChange(comp.field)"
               :status="getFieldStatus(comp.field)"
@@ -28,6 +26,7 @@
               v-model:value="formData[comp.field]"
               type="textarea"
               :placeholder="comp.placeholder"
+              :disabled="comp.disabled"
               :rows="3"
               @blur="handleFieldBlur(comp.field)"
               @update:value="handleFieldChange(comp.field)"
@@ -38,6 +37,7 @@
               v-model:value="formData[comp.field]"
               :options="comp.options"
               :placeholder="comp.placeholder"
+              :disabled="comp.disabled"
               @blur="handleFieldBlur(comp.field)"
               @update:value="handleFieldChange(comp.field)"
               :status="getFieldStatus(comp.field)"
@@ -45,6 +45,7 @@
             <n-radio-group
               v-else-if="comp.type === 'radio'"
               v-model:value="formData[comp.field]"
+              :disabled="comp.disabled"
               @update:value="handleFieldChange(comp.field)"
             >
               <n-space>
@@ -56,6 +57,7 @@
             <n-checkbox-group
               v-else-if="comp.type === 'checkbox'"
               v-model:value="formData[comp.field]"
+              :disabled="comp.disabled"
               @update:value="handleFieldChange(comp.field)"
             >
               <n-space>
@@ -68,12 +70,16 @@
               v-else-if="comp.type === 'date'"
               v-model:value="formData[comp.field]"
               type="date"
+              :placeholder="comp.placeholder"
+              :disabled="comp.disabled"
               @blur="handleFieldBlur(comp.field)"
               @update:value="handleFieldChange(comp.field)"
             />
             <n-time-picker
               v-else-if="comp.type === 'time'"
               v-model:value="formData[comp.field]"
+              :placeholder="comp.placeholder"
+              :disabled="comp.disabled"
               @blur="handleFieldBlur(comp.field)"
               @update:value="handleFieldChange(comp.field)"
             />
@@ -81,6 +87,7 @@
               v-else-if="comp.type === 'rating'"
               v-model:value="formData[comp.field]"
               :count="comp.maxStars || 5"
+              :disabled="comp.disabled"
               @update:value="handleFieldChange(comp.field)"
             />
             <n-upload
@@ -88,6 +95,7 @@
               v-model:file-list="uploadFileLists[comp.field]"
               :accept="(comp.acceptTypes || []).join(',')"
               :max="1"
+              :disabled="comp.disabled"
               @before-upload="(data) => handleBeforeUpload(comp, data)"
             >
               <n-button>
@@ -105,9 +113,11 @@
             <n-switch
               v-else-if="comp.type === 'switch'"
               v-model:value="formData[comp.field]"
+              :disabled="comp.disabled"
               @update:value="handleFieldChange(comp.field)"
             />
           </div>
+          <div v-if="comp.helpText" class="help-text">{{ comp.helpText }}</div>
           <div v-if="showError(comp.field)" class="error-tip">
             {{ fieldErrors[comp.field][0] }}
           </div>
@@ -168,14 +178,16 @@ watch(() => props.schemaList, (list) => {
   submitted.value = false
   list.forEach(item => {
     if (item.type === 'checkbox') {
-      formData[item.field] = []
+      formData[item.field] = item.defaultValue !== undefined ? item.defaultValue : []
     } else if (item.type === 'switch') {
       formData[item.field] = item.defaultValue !== undefined ? item.defaultValue : false
     } else if (item.type === 'upload') {
       formData[item.field] = null
       uploadFileLists[item.field] = []
+    } else if (item.type === 'input' || item.type === 'textarea') {
+      formData[item.field] = item.defaultValue !== undefined ? item.defaultValue : ''
     } else {
-      formData[item.field] = null
+      formData[item.field] = item.defaultValue !== undefined ? item.defaultValue : null
     }
     fieldErrors[item.field] = []
     touchedFields[item.field] = false
@@ -351,5 +363,12 @@ function handleSubmit() {
   font-size: 12px;
   color: #64748b;
   margin-top: 4px;
+}
+
+.help-text {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
+  line-height: 1.4;
 }
 </style>

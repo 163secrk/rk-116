@@ -51,14 +51,20 @@ const componentList = [
     label: '输入框',
     field: 'input_',
     placeholder: '请输入',
-    icon: TextOutline
+    icon: TextOutline,
+    defaultValue: '',
+    helpText: '',
+    disabled: false
   },
   {
     type: 'textarea',
     label: '文本域',
     field: 'textarea_',
     placeholder: '请输入',
-    icon: DocumentTextOutline
+    icon: DocumentTextOutline,
+    defaultValue: '',
+    helpText: '',
+    disabled: false
   },
   {
     type: 'select',
@@ -69,7 +75,10 @@ const componentList = [
     options: [
       { label: '选项一', value: 'option1' },
       { label: '选项二', value: 'option2' }
-    ]
+    ],
+    defaultValue: null,
+    helpText: '',
+    disabled: false
   },
   {
     type: 'radio',
@@ -79,7 +88,10 @@ const componentList = [
     options: [
       { label: '选项一', value: 'option1' },
       { label: '选项二', value: 'option2' }
-    ]
+    ],
+    defaultValue: null,
+    helpText: '',
+    disabled: false
   },
   {
     type: 'checkbox',
@@ -89,28 +101,40 @@ const componentList = [
     options: [
       { label: '选项一', value: 'option1' },
       { label: '选项二', value: 'option2' }
-    ]
+    ],
+    defaultValue: [],
+    helpText: '',
+    disabled: false
   },
   {
     type: 'date',
     label: '日期',
     field: 'date_',
     placeholder: '请选择日期',
-    icon: CalendarOutline
+    icon: CalendarOutline,
+    defaultValue: null,
+    helpText: '',
+    disabled: false
   },
   {
     type: 'time',
     label: '时间',
     field: 'time_',
     placeholder: '请选择时间',
-    icon: TimeOutline
+    icon: TimeOutline,
+    defaultValue: null,
+    helpText: '',
+    disabled: false
   },
   {
     type: 'rating',
     label: '评分',
     field: 'rating_',
     icon: StarOutline,
-    maxStars: 5
+    maxStars: 5,
+    defaultValue: null,
+    helpText: '',
+    disabled: false
   },
   {
     type: 'upload',
@@ -118,14 +142,18 @@ const componentList = [
     field: 'upload_',
     icon: CloudUploadOutline,
     acceptTypes: ['image/*', 'application/pdf', '.doc', '.docx'],
-    maxSize: 10
+    maxSize: 10,
+    helpText: '',
+    disabled: false
   },
   {
     type: 'switch',
     label: '开关',
     field: 'switch_',
     icon: ToggleOutline,
-    defaultValue: false
+    defaultValue: false,
+    helpText: '',
+    disabled: false
   }
 ]
 

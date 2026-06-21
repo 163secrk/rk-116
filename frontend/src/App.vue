@@ -100,7 +100,9 @@ function handleAddComponent(component) {
     maxStars: component.maxStars || 5,
     acceptTypes: component.acceptTypes ? JSON.parse(JSON.stringify(component.acceptTypes)) : [],
     maxSize: component.maxSize || 10,
-    defaultValue: component.defaultValue !== undefined ? component.defaultValue : false,
+    defaultValue: component.defaultValue !== undefined ? component.defaultValue : null,
+    helpText: component.helpText || '',
+    disabled: component.disabled !== undefined ? component.disabled : false,
     validation: {
       required: false,
       requiredMessage: '该项为必填项',
@@ -189,8 +191,22 @@ function ensureValidation(item) {
       item.maxSize = 10
     }
   }
-  if (item.type === 'switch' && item.defaultValue === undefined) {
-    item.defaultValue = false
+  if (item.defaultValue === undefined) {
+    if (item.type === 'switch') {
+      item.defaultValue = false
+    } else if (item.type === 'checkbox') {
+      item.defaultValue = []
+    } else if (item.type === 'input' || item.type === 'textarea') {
+      item.defaultValue = ''
+    } else {
+      item.defaultValue = null
+    }
+  }
+  if (item.helpText === undefined) {
+    item.helpText = ''
+  }
+  if (item.disabled === undefined) {
+    item.disabled = false
   }
   return item
 }

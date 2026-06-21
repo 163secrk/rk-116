@@ -20,6 +20,7 @@
                 placeholder="请输入标签"
                 size="small"
               />
+              <div class="field-help">表单中显示的字段名称</div>
             </n-form-item>
             <n-form-item label="字段名">
               <n-input
@@ -28,6 +29,7 @@
                 placeholder="请输入字段名"
                 size="small"
               />
+              <div class="field-help">数据提交时的字段标识，建议使用英文</div>
             </n-form-item>
             <n-form-item v-if="hasPlaceholder" label="占位符">
               <n-input
@@ -36,6 +38,113 @@
                 placeholder="请输入占位符"
                 size="small"
               />
+              <div class="field-help">输入框为空时显示的提示文字</div>
+            </n-form-item>
+            <n-form-item label="帮助说明">
+              <n-input
+                :value="localComp.helpText"
+                @update:value="val => updateField('helpText', val)"
+                placeholder="请输入帮助说明"
+                size="small"
+              />
+              <div class="field-help">字段下方显示的灰色提示文字</div>
+            </n-form-item>
+            <n-form-item label="是否禁用">
+              <n-switch
+                :value="localComp.disabled"
+                @update:value="val => updateField('disabled', val)"
+              />
+              <div class="field-help">禁用后表单字段变灰不可编辑</div>
+            </n-form-item>
+          </n-form>
+        </div>
+
+        <div v-if="hasDefaultValue" class="property-section">
+          <div class="section-title">默认值</div>
+          <n-form label-placement="left" label-width="80px">
+            <n-form-item v-if="isInputType" label="默认值">
+              <n-input
+                :value="localComp.defaultValue"
+                @update:value="val => updateField('defaultValue', val)"
+                placeholder="请输入默认值"
+                size="small"
+              />
+              <div class="field-help">表单初始化时自动填充的值</div>
+            </n-form-item>
+            <n-form-item v-if="isTextareaType" label="默认值">
+              <n-input
+                :value="localComp.defaultValue"
+                @update:value="val => updateField('defaultValue', val)"
+                type="textarea"
+                :rows="3"
+                placeholder="请输入默认值"
+                size="small"
+              />
+              <div class="field-help">表单初始化时自动填充的值</div>
+            </n-form-item>
+            <n-form-item v-if="isSelectType || isRadioType" label="默认值">
+              <n-select
+                :value="localComp.defaultValue"
+                @update:value="val => updateField('defaultValue', val)"
+                :options="localComp.options"
+                placeholder="请选择默认值"
+                size="small"
+                clearable
+              />
+              <div class="field-help">表单初始化时默认选中的选项</div>
+            </n-form-item>
+            <n-form-item v-if="isCheckboxType" label="默认值">
+              <n-checkbox-group
+                :value="localComp.defaultValue"
+                @update:value="val => updateField('defaultValue', val)"
+              >
+                <n-space>
+                  <n-checkbox
+                    v-for="opt in localComp.options"
+                    :key="opt.value"
+                    :value="opt.value"
+                  >
+                    {{ opt.label }}
+                  </n-checkbox>
+                </n-space>
+              </n-checkbox-group>
+              <div class="field-help">表单初始化时默认选中的选项</div>
+            </n-form-item>
+            <n-form-item v-if="isDateType" label="默认值">
+              <n-date-picker
+                :value="localComp.defaultValue"
+                @update:value="val => updateField('defaultValue', val)"
+                type="date"
+                size="small"
+                clearable
+                style="width: 100%"
+              />
+              <div class="field-help">表单初始化时默认选中的日期</div>
+            </n-form-item>
+            <n-form-item v-if="isTimeType" label="默认值">
+              <n-time-picker
+                :value="localComp.defaultValue"
+                @update:value="val => updateField('defaultValue', val)"
+                size="small"
+                clearable
+                style="width: 100%"
+              />
+              <div class="field-help">表单初始化时默认选中的时间</div>
+            </n-form-item>
+            <n-form-item v-if="isRatingType" label="默认值">
+              <n-rate
+                :value="localComp.defaultValue"
+                @update:value="val => updateField('defaultValue', val)"
+                :count="localComp.maxStars || 5"
+              />
+              <div class="field-help">表单初始化时默认的评分</div>
+            </n-form-item>
+            <n-form-item v-if="isSwitchType" label="默认值">
+              <n-switch
+                :value="localComp.defaultValue"
+                @update:value="val => updateField('defaultValue', val)"
+              />
+              <div class="field-help">表单初始化时开关的默认状态</div>
             </n-form-item>
           </n-form>
         </div>
@@ -299,7 +408,7 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
-import { NIcon, NForm, NFormItem, NInput, NSwitch, NButton, NInputNumber } from 'naive-ui'
+import { NIcon, NForm, NFormItem, NInput, NSwitch, NButton, NInputNumber, NSelect, NCheckboxGroup, NCheckbox, NSpace, NDatePicker, NTimePicker, NRate } from 'naive-ui'
 import { SettingsOutline, HandRightOutline, AddOutline, TrashOutline } from '@vicons/ionicons5'
 
 const props = defineProps({
@@ -340,7 +449,9 @@ function getDefaultLocalComp() {
     maxStars: 5,
     acceptTypes: [],
     maxSize: 10,
-    defaultValue: false,
+    defaultValue: null,
+    helpText: '',
+    disabled: false,
     validation: getDefaultValidation()
   }
 }
@@ -363,8 +474,22 @@ function ensureValidation(comp) {
       comp.maxSize = 10
     }
   }
-  if (comp.type === 'switch' && comp.defaultValue === undefined) {
-    comp.defaultValue = false
+  if (comp.defaultValue === undefined) {
+    if (comp.type === 'switch') {
+      comp.defaultValue = false
+    } else if (comp.type === 'checkbox') {
+      comp.defaultValue = []
+    } else if (comp.type === 'input' || comp.type === 'textarea') {
+      comp.defaultValue = ''
+    } else {
+      comp.defaultValue = null
+    }
+  }
+  if (comp.helpText === undefined) {
+    comp.helpText = ''
+  }
+  if (comp.disabled === undefined) {
+    comp.disabled = false
   }
   return comp
 }
@@ -421,8 +546,40 @@ const hasPlaceholder = computed(() => {
   return ['input', 'textarea', 'select', 'date', 'time'].includes(localComp.value.type)
 })
 
+const hasDefaultValue = computed(() => {
+  return ['input', 'textarea', 'select', 'radio', 'checkbox', 'date', 'time', 'rating', 'switch'].includes(localComp.value.type)
+})
+
 const hasOptions = computed(() => {
   return ['select', 'radio', 'checkbox'].includes(localComp.value.type)
+})
+
+const isInputType = computed(() => {
+  return localComp.value.type === 'input'
+})
+
+const isTextareaType = computed(() => {
+  return localComp.value.type === 'textarea'
+})
+
+const isSelectType = computed(() => {
+  return localComp.value.type === 'select'
+})
+
+const isRadioType = computed(() => {
+  return localComp.value.type === 'radio'
+})
+
+const isCheckboxType = computed(() => {
+  return localComp.value.type === 'checkbox'
+})
+
+const isDateType = computed(() => {
+  return localComp.value.type === 'date'
+})
+
+const isTimeType = computed(() => {
+  return localComp.value.type === 'time'
 })
 
 const isRatingType = computed(() => {
@@ -641,5 +798,12 @@ function removeOption(idx) {
 
 :deep(.n-form-item) {
   position: relative;
+}
+
+.field-help {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
+  line-height: 1.4;
 }
 </style>
