@@ -8,7 +8,7 @@
             <div class="toolbar-left">
               <h1 class="app-title">低代码表单搭建器</h1>
             </div>
-            <div class="toolbar-right">
+            <div v-if="currentPage === 'builder'" class="toolbar-right">
               <n-input
                 v-model:value="formName"
                 placeholder="表单名称"
@@ -28,23 +28,57 @@
                   </template>
                   保存
                 </n-button>
+                <n-button size="small" @click="handleSaveAs">
+                  <template #icon>
+                    <n-icon><DuplicateOutline /></n-icon>
+                  </template>
+                  另存为
+                </n-button>
               </n-space>
             </div>
           </header>
 
           <div class="main-content">
-            <ComponentPanel @add-component="handleAddComponent" />
-            <FormCanvas
-              :schema-list="schemaList"
-              :selected-id="selectedId"
-              @select-component="handleSelect"
-              @add-component="handleAddComponent"
-              @remove-component="handleRemove"
-              @add-to-container="handleAddToContainer"
-            />
-            <PropertyPanel
-              :selected-component="selectedComponent"
-              @update-component="handleUpdateComponent"
+            <aside class="side-menu">
+              <div
+                :class="['menu-item', { active: currentPage === 'builder' }]"
+                @click="switchToBuilder"
+              >
+                <n-icon size="20"><BuildOutline /></n-icon>
+                <span>表单搭建</span>
+              </div>
+              <div
+                :class="['menu-item', { active: currentPage === 'templates' }]"
+                @click="switchToTemplates"
+              >
+                <n-icon size="20"><DocumentsOutline /></n-icon>
+                <span>我的模板</span>
+              </div>
+            </aside>
+
+            <div v-if="currentPage === 'builder'" class="builder-content">
+              <ComponentPanel @add-component="handleAddComponent" />
+              <FormCanvas
+                :schema-list="schemaList"
+                :selected-id="selectedId"
+                @select-component="handleSelect"
+                @add-component="handleAddComponent"
+                @remove-component="handleRemove"
+                @add-to-container="handleAddToContainer"
+              />
+              <PropertyPanel
+                :selected-component="selectedComponent"
+                @update-component="handleUpdateComponent"
+              />
+            </div>
+
+            <TemplateManager
+              v-if="currentPage === 'templates'"
+              ref="templateManagerRef"
+              :current-schema-list="schemaList"
+              :current-form-name="formName"
+              @edit-template="handleEditTemplate"
+              @create-new="handleCreateNewTemplate"
             />
           </div>
 
@@ -53,6 +87,23 @@
             :schema-list="schemaList"
             :form-name="formName"
           />
+
+          <n-modal
+            v-model:show="showSaveAsModal"
+            preset="dialog"
+            title="另存为模板"
+            positive-text="确定"
+            negative-text="取消"
+            @positive-click="handleSaveAsConfirm"
+            @negative-click="showSaveAsModal = false"
+          >
+            <div style="margin-bottom: 12px">请输入新模板名称：</div>
+            <n-input
+              v-model:value="newTemplateName"
+              placeholder="模板名称"
+              @keyup.enter="handleSaveAsConfirm"
+            />
+          </n-modal>
         </div>
       </n-dialog-provider>
     </n-message-provider>
@@ -61,21 +112,34 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { NConfigProvider, NGlobalStyle, NButton, NSpace, NInput, NIcon, NMessageProvider, NDialogProvider, createDiscreteApi } from 'naive-ui'
+import {
+  NConfigProvider, NGlobalStyle, NButton, NSpace, NInput, NIcon,
+  NMessageProvider, NDialogProvider, NModal, createDiscreteApi
+} from 'naive-ui'
 import { darkTheme } from 'naive-ui'
-import { EyeOutline, SaveOutline } from '@vicons/ionicons5'
+import {
+  EyeOutline, SaveOutline, DuplicateOutline, BuildOutline, DocumentsOutline
+} from '@vicons/ionicons5'
 import axios from 'axios'
 import ComponentPanel from './components/ComponentPanel.vue'
 import FormCanvas from './components/FormCanvas.vue'
 import PropertyPanel from './components/PropertyPanel.vue'
 import PreviewModal from './components/PreviewModal.vue'
+import TemplateManager from './components/TemplateManager.vue'
 
 const { message } = createDiscreteApi(['message'])
+
+const currentPage = ref('builder')
+const templateManagerRef = ref(null)
 
 const formName = ref('未命名表单')
 const schemaList = ref([])
 const selectedId = ref(null)
 const showPreview = ref(false)
+const currentTemplateId = ref(null)
+
+const showSaveAsModal = ref(false)
+const newTemplateName = ref('')
 
 const themeOverrides = {
   common: {
@@ -216,9 +280,55 @@ async function handleSave() {
       name: formName.value,
       schemaData: JSON.stringify(schemaList.value)
     }
-    const res = await axios.post('/api/forms', payload)
+
+    let res
+    if (currentTemplateId.value) {
+      res = await axios.put(`/api/forms/${currentTemplateId.value}`, payload)
+    } else {
+      res = await axios.post('/api/forms', payload)
+      if (res.data.success && res.data.data) {
+        currentTemplateId.value = res.data.data.id
+      }
+    }
+
     if (res.data.success) {
       message.success('保存成功')
+      if (templateManagerRef.value) {
+        templateManagerRef.value.loadTemplates()
+      }
+    } else {
+      message.error('保存失败')
+    }
+  } catch (e) {
+    message.error('保存失败：' + e.message)
+  }
+}
+
+function handleSaveAs() {
+  newTemplateName.value = (formName.value || '未命名模板') + ' 副本'
+  showSaveAsModal.value = true
+}
+
+async function handleSaveAsConfirm() {
+  if (!newTemplateName.value.trim()) {
+    message.warning('请输入模板名称')
+    return
+  }
+  try {
+    const payload = {
+      name: newTemplateName.value.trim(),
+      schemaData: JSON.stringify(schemaList.value)
+    }
+    const res = await axios.post('/api/forms', payload)
+    if (res.data.success) {
+      message.success('另存成功')
+      showSaveAsModal.value = false
+      formName.value = newTemplateName.value.trim()
+      currentTemplateId.value = res.data.data.id
+      newTemplateName.value = ''
+      if (templateManagerRef.value) {
+        templateManagerRef.value.loadTemplates()
+      }
     } else {
       message.error('保存失败')
     }
@@ -286,12 +396,46 @@ function ensureValidation(item) {
   return item
 }
 
+function switchToBuilder() {
+  currentPage.value = 'builder'
+}
+
+function switchToTemplates() {
+  currentPage.value = 'templates'
+  if (templateManagerRef.value) {
+    templateManagerRef.value.loadTemplates()
+  }
+}
+
+function handleEditTemplate(template) {
+  formName.value = template.name
+  currentTemplateId.value = template.id
+  selectedId.value = null
+  try {
+    const list = JSON.parse(template.schemaData) || []
+    schemaList.value = list.map(item => ensureValidation(item))
+  } catch (e) {
+    schemaList.value = []
+  }
+  currentPage.value = 'builder'
+  message.success('已加载模板：' + template.name)
+}
+
+function handleCreateNewTemplate() {
+  formName.value = '未命名表单'
+  schemaList.value = []
+  selectedId.value = null
+  currentTemplateId.value = null
+  currentPage.value = 'builder'
+}
+
 onMounted(async () => {
   try {
     const res = await axios.get('/api/forms')
     if (res.data.success && res.data.data && res.data.data.length > 0) {
       const latest = res.data.data[res.data.data.length - 1]
       formName.value = latest.name
+      currentTemplateId.value = latest.id
       try {
         const list = JSON.parse(latest.schemaData) || []
         schemaList.value = list.map(item => ensureValidation(item))
@@ -358,6 +502,46 @@ body {
 }
 
 .main-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.side-menu {
+  width: 180px;
+  background: #1e293b;
+  border-right: 1px solid #334155;
+  padding: 16px 0;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  color: #cbd5e1;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+  border-left: 3px solid transparent;
+}
+
+.menu-item:hover {
+  background: rgba(99, 102, 241, 0.1);
+  color: #e2e8f0;
+}
+
+.menu-item.active {
+  background: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+  border-left-color: #6366f1;
+}
+
+.builder-content {
   flex: 1;
   display: flex;
   overflow: hidden;

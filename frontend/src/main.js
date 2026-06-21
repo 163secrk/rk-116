@@ -19,7 +19,14 @@ import {
   NSwitch,
   NDatePicker,
   NTimePicker,
-  NModal
+  NModal,
+  NCard,
+  NGrid,
+  NGi,
+  NEmpty,
+  NSpin,
+  NMenu,
+  NDivider
 } from 'naive-ui'
 import App from './App.vue'
 
@@ -43,7 +50,14 @@ const naive = create({
     NSwitch,
     NDatePicker,
     NTimePicker,
-    NModal
+    NModal,
+    NCard,
+    NGrid,
+    NGi,
+    NEmpty,
+    NSpin,
+    NMenu,
+    NDivider
   ]
 })
 
