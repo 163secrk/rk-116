@@ -24,6 +24,9 @@ public class FormSchema {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(columnDefinition = "TEXT")
+    private String tags;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

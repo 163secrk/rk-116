@@ -18,6 +18,10 @@ public class FormSchemaService {
         return formSchemaRepository.findAll();
     }
 
+    public List<FormSchema> findByNameContaining(String name) {
+        return formSchemaRepository.findByNameContainingIgnoreCase(name);
+    }
+
     public Optional<FormSchema> findById(Long id) {
         return formSchemaRepository.findById(id);
     }
@@ -28,5 +32,9 @@ public class FormSchemaService {
 
     public void deleteById(Long id) {
         formSchemaRepository.deleteById(id);
+    }
+
+    public void deleteByIds(List<Long> ids) {
+        formSchemaRepository.deleteAllById(ids);
     }
 }

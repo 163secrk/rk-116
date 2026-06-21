@@ -19,8 +19,14 @@ public class FormSchemaController {
     private FormSchemaService formSchemaService;
 
     @GetMapping
-    public ResponseEntity<Map<String, Object>> findAll() {
-        List<FormSchema> list = formSchemaService.findAll();
+    public ResponseEntity<Map<String, Object>> findAll(
+            @RequestParam(required = false) String keyword) {
+        List<FormSchema> list;
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            list = formSchemaService.findByNameContaining(keyword.trim());
+        } else {
+            list = formSchemaService.findAll();
+        }
         Map<String, Object> result = new HashMap<>();
         result.put("success", true);
         result.put("data", list);
@@ -58,6 +64,7 @@ public class FormSchemaController {
             FormSchema existing = optional.get();
             existing.setName(formSchema.getName());
             existing.setSchemaData(formSchema.getSchemaData());
+            existing.setTags(formSchema.getTags());
             FormSchema updated = formSchemaService.save(existing);
             result.put("success", true);
             result.put("data", updated);
@@ -71,6 +78,14 @@ public class FormSchemaController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> delete(@PathVariable Long id) {
         formSchemaService.deleteById(id);
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        return ResponseEntity.ok(result);
+    }
+
+    @DeleteMapping("/batch")
+    public ResponseEntity<Map<String, Object>> batchDelete(@RequestBody List<Long> ids) {
+        formSchemaService.deleteByIds(ids);
         Map<String, Object> result = new HashMap<>();
         result.put("success", true);
         return ResponseEntity.ok(result);
