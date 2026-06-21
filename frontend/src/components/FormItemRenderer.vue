@@ -1,12 +1,28 @@
 <template>
   <div class="form-item">
-    <label class="form-label">
+    <label v-if="component.type !== 'container'" class="form-label">
       {{ component.label || '未命名' }}
       <span v-if="component.validation?.required" class="required">*</span>
     </label>
     <div class="form-control">
+      <div
+        v-if="component.type === 'container'"
+        class="container-wrapper"
+        :style="{ gridTemplateColumns: `repeat(${component.columns || 2}, 1fr)` }"
+      >
+        <div
+          v-for="child in component.children || []"
+          :key="child.id"
+          class="container-item"
+        >
+          <FormItemRenderer :component="child" />
+        </div>
+        <div v-if="!component.children || component.children.length === 0" class="container-empty">
+          空容器，拖拽组件到此处
+        </div>
+      </div>
       <n-input
-        v-if="component.type === 'input'"
+        v-else-if="component.type === 'input'"
         :placeholder="component.placeholder"
         size="small"
         :disabled="component.disabled"
@@ -97,13 +113,17 @@
         :disabled="component.disabled"
       />
     </div>
-    <div v-if="component.helpText" class="help-text">{{ component.helpText }}</div>
+    <div v-if="component.helpText && component.type !== 'container'" class="help-text">{{ component.helpText }}</div>
   </div>
 </template>
 
 <script setup>
 import { NInput, NSelect, NRadioGroup, NRadio, NCheckboxGroup, NCheckbox, NSpace, NDatePicker, NTimePicker, NRate,NUpload, NButton, NIcon, NSwitch } from 'naive-ui'
 import { CloudUploadOutline } from '@vicons/ionicons5'
+
+defineOptions({
+  name: 'FormItemRenderer'
+})
 
 defineProps({
   component: {
@@ -146,5 +166,26 @@ defineProps({
   color: #64748b;
   margin-top: 6px;
   line-height: 1.4;
+}
+
+.container-wrapper {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+}
+
+.container-item {
+  min-width: 0;
+}
+
+.container-empty {
+  grid-column: 1 / -1;
+  padding: 24px;
+  text-align: center;
+  color: #64748b;
+  font-size: 13px;
+  border: 2px dashed #334155;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.5);
 }
 </style>

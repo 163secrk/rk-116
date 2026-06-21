@@ -13,7 +13,7 @@
         <div class="property-section">
           <div class="section-title">基本属性</div>
           <n-form label-placement="left" label-width="80px">
-            <n-form-item label="标签">
+            <n-form-item v-if="!isContainerType" label="标签">
               <n-input
                 :value="localComp.label"
                 @update:value="val => updateField('label', val)"
@@ -22,7 +22,7 @@
               />
               <div class="field-help">表单中显示的字段名称</div>
             </n-form-item>
-            <n-form-item label="字段名">
+            <n-form-item v-if="!isContainerType" label="字段名">
               <n-input
                 :value="localComp.field"
                 @update:value="val => updateField('field', val)"
@@ -40,7 +40,7 @@
               />
               <div class="field-help">输入框为空时显示的提示文字</div>
             </n-form-item>
-            <n-form-item label="帮助说明">
+            <n-form-item v-if="!isContainerType" label="帮助说明">
               <n-input
                 :value="localComp.helpText"
                 @update:value="val => updateField('helpText', val)"
@@ -49,12 +49,29 @@
               />
               <div class="field-help">字段下方显示的灰色提示文字</div>
             </n-form-item>
-            <n-form-item label="是否禁用">
+            <n-form-item v-if="!isContainerType" label="是否禁用">
               <n-switch
                 :value="localComp.disabled"
                 @update:value="val => updateField('disabled', val)"
               />
               <div class="field-help">禁用后表单字段变灰不可编辑</div>
+            </n-form-item>
+          </n-form>
+        </div>
+
+        <div v-if="isContainerType" class="property-section">
+          <div class="section-title">容器配置</div>
+          <n-form label-placement="left" label-width="80px">
+            <n-form-item label="列数">
+              <n-input-number
+                :value="localComp.columns"
+                @update:value="val => updateField('columns', val)"
+                :min="1"
+                :max="6"
+                size="small"
+                style="width: 100%"
+              />
+              <div class="field-help">布局容器的列数，支持1-6列</div>
             </n-form-item>
           </n-form>
         </div>
@@ -261,7 +278,7 @@
           </div>
         </div>
 
-        <div class="property-section">
+        <div v-if="!isContainerType" class="property-section">
           <div class="section-title">校验规则</div>
           <n-form label-placement="left" label-width="80px">
             <div class="validation-item">
@@ -452,6 +469,8 @@ function getDefaultLocalComp() {
     defaultValue: null,
     helpText: '',
     disabled: false,
+    columns: 2,
+    children: [],
     validation: getDefaultValidation()
   }
 }
@@ -474,6 +493,15 @@ function ensureValidation(comp) {
       comp.maxSize = 10
     }
   }
+  if (comp.type === 'container') {
+    if (comp.columns === undefined) {
+      comp.columns = 2
+    }
+    if (comp.children === undefined) {
+      comp.children = []
+    }
+    comp.children = comp.children.map(child => ensureValidation(child))
+  }
   if (comp.defaultValue === undefined) {
     if (comp.type === 'switch') {
       comp.defaultValue = false
@@ -481,6 +509,8 @@ function ensureValidation(comp) {
       comp.defaultValue = []
     } else if (comp.type === 'input' || comp.type === 'textarea') {
       comp.defaultValue = ''
+    } else if (comp.type === 'container') {
+      comp.defaultValue = null
     } else {
       comp.defaultValue = null
     }
@@ -543,15 +573,15 @@ function updateOption(idx, key, value) {
 }
 
 const hasPlaceholder = computed(() => {
-  return ['input', 'textarea', 'select', 'date', 'time'].includes(localComp.value.type)
+  return !isContainerType.value && ['input', 'textarea', 'select', 'date', 'time'].includes(localComp.value.type)
 })
 
 const hasDefaultValue = computed(() => {
-  return ['input', 'textarea', 'select', 'radio', 'checkbox', 'date', 'time', 'rating', 'switch'].includes(localComp.value.type)
+  return !isContainerType.value && ['input', 'textarea', 'select', 'radio', 'checkbox', 'date', 'time', 'rating', 'switch'].includes(localComp.value.type)
 })
 
 const hasOptions = computed(() => {
-  return ['select', 'radio', 'checkbox'].includes(localComp.value.type)
+  return !isContainerType.value && ['select', 'radio', 'checkbox'].includes(localComp.value.type)
 })
 
 const isInputType = computed(() => {
@@ -592,6 +622,10 @@ const isUploadType = computed(() => {
 
 const isSwitchType = computed(() => {
   return localComp.value.type === 'switch'
+})
+
+const isContainerType = computed(() => {
+  return localComp.value.type === 'container'
 })
 
 const supportsPattern = computed(() => {

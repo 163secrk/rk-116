@@ -38,8 +38,9 @@
               :schema-list="schemaList"
               :selected-id="selectedId"
               @select-component="handleSelect"
-              @update-list="handleUpdateList"
+              @add-component="handleAddComponent"
               @remove-component="handleRemove"
+              @add-to-container="handleAddToContainer"
             />
             <PropertyPanel
               :selected-component="selectedComponent"
@@ -85,11 +86,50 @@ const themeOverrides = {
 }
 
 const selectedComponent = computed(() => {
-  return schemaList.value.find(item => item.id === selectedId.value) || null
+  return findComponentById(schemaList.value, selectedId.value)
 })
 
+function findComponentById(list, id) {
+  for (const item of list) {
+    if (item.id === id) return item
+    if (item.children && item.children.length > 0) {
+      const found = findComponentById(item.children, id)
+      if (found) return found
+    }
+  }
+  return null
+}
+
 function handleAddComponent(component) {
-  const newItem = {
+  const newItem = createComponentItem(component)
+  schemaList.value = [...schemaList.value, newItem]
+  selectedId.value = newItem.id
+}
+
+function handleAddToContainer(containerId, component) {
+  const newItem = createComponentItem(component)
+  addToContainer(schemaList.value, containerId, newItem)
+  schemaList.value = [...schemaList.value]
+  selectedId.value = newItem.id
+}
+
+function addToContainer(items, containerId, newItem) {
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].id === containerId && items[i].type === 'container') {
+      items[i].children.push(newItem)
+      return true
+    }
+    if (items[i].children && items[i].children.length > 0) {
+      if (addToContainer(items[i].children, containerId, newItem)) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+function createComponentItem(component) {
+  const baseItem = {
     id: Date.now() + Math.random().toString(36).substr(2, 9),
     type: component.type,
     label: component.label,
@@ -118,7 +158,11 @@ function handleAddComponent(component) {
       maxMessage: '数值不能大于最大值'
     }
   }
-  schemaList.value.push(newItem)
+  if (component.type === 'container') {
+    baseItem.columns = component.columns || 2
+    baseItem.children = []
+  }
+  return baseItem
 }
 
 function handleSelect(id) {
@@ -130,16 +174,36 @@ function handleUpdateList(list) {
 }
 
 function handleRemove(id) {
-  schemaList.value = schemaList.value.filter(item => item.id !== id)
+  schemaList.value = removeComponentById(schemaList.value, id)
   if (selectedId.value === id) {
     selectedId.value = null
   }
 }
 
+function removeComponentById(list, id) {
+  return list.filter(item => {
+    if (item.id === id) return false
+    if (item.children && item.children.length > 0) {
+      item.children = removeComponentById(item.children, id)
+    }
+    return true
+  })
+}
+
 function handleUpdateComponent(updated) {
-  schemaList.value = schemaList.value.map(item =>
-    item.id === updated.id ? { ...item, ...updated } : item
-  )
+  schemaList.value = updateComponentById(schemaList.value, updated)
+}
+
+function updateComponentById(list, updated) {
+  return list.map(item => {
+    if (item.id === updated.id) {
+      return { ...item, ...updated }
+    }
+    if (item.children && item.children.length > 0) {
+      return { ...item, children: updateComponentById(item.children, updated) }
+    }
+    return item
+  })
 }
 
 async function handleSave() {
@@ -191,6 +255,15 @@ function ensureValidation(item) {
       item.maxSize = 10
     }
   }
+  if (item.type === 'container') {
+    if (item.columns === undefined) {
+      item.columns = 2
+    }
+    if (item.children === undefined) {
+      item.children = []
+    }
+    item.children = item.children.map(child => ensureValidation(child))
+  }
   if (item.defaultValue === undefined) {
     if (item.type === 'switch') {
       item.defaultValue = false
@@ -198,6 +271,8 @@ function ensureValidation(item) {
       item.defaultValue = []
     } else if (item.type === 'input' || item.type === 'textarea') {
       item.defaultValue = ''
+    } else if (item.type === 'container') {
+      item.defaultValue = null
     } else {
       item.defaultValue = null
     }
