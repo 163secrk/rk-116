@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -39,6 +40,8 @@ public class PublishedFormService {
         return publishedFormRepository.findByFormIdAndStatus(formId, "PUBLISHED");
     }
 
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
     public PublishedForm publishForm(Long formId, Map<String, Object> settings) {
         Optional<FormSchema> formOpt = formSchemaRepository.findById(formId);
         if (!formOpt.isPresent()) {
@@ -51,23 +54,40 @@ public class PublishedFormService {
         String accessPassword = null;
 
         if (settings != null) {
-            if (settings.get("deadline") != null && !((String) settings.get("deadline")).isEmpty()) {
-                deadline = LocalDateTime.parse((String) settings.get("deadline"));
+            Object deadlineObj = settings.get("deadline");
+            if (deadlineObj != null) {
+                String deadlineStr = String.valueOf(deadlineObj).trim();
+                if (!deadlineStr.isEmpty() && !"null".equalsIgnoreCase(deadlineStr)) {
+                    try {
+                        if (deadlineStr.contains("T")) {
+                            deadline = LocalDateTime.parse(deadlineStr);
+                        } else {
+                            deadline = LocalDateTime.parse(deadlineStr, DATE_TIME_FORMATTER);
+                        }
+                    } catch (Exception e) {
+                    }
+                }
             }
             Object maxSub = settings.get("maxSubmissionsPerPerson");
             if (maxSub != null) {
                 if (maxSub instanceof Number) {
                     maxSubmissionsPerPerson = ((Number) maxSub).intValue();
-                } else if (maxSub instanceof String && !((String) maxSub).isEmpty()) {
-                    try {
-                        maxSubmissionsPerPerson = Integer.parseInt((String) maxSub);
-                    } catch (NumberFormatException e) {
+                } else {
+                    String maxSubStr = String.valueOf(maxSub).trim();
+                    if (!maxSubStr.isEmpty() && !"null".equalsIgnoreCase(maxSubStr)) {
+                        try {
+                            maxSubmissionsPerPerson = Integer.parseInt(maxSubStr);
+                        } catch (NumberFormatException e) {
+                        }
                     }
                 }
             }
             Object pwd = settings.get("accessPassword");
-            if (pwd != null && !((String) pwd).isEmpty()) {
-                accessPassword = (String) pwd;
+            if (pwd != null) {
+                String pwdStr = String.valueOf(pwd).trim();
+                if (!pwdStr.isEmpty() && !"null".equalsIgnoreCase(pwdStr)) {
+                    accessPassword = pwdStr;
+                }
             }
         }
 
