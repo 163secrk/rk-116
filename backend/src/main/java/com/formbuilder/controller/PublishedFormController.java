@@ -109,4 +109,18 @@ public class PublishedFormController {
         result.put("success", true);
         return ResponseEntity.ok(result);
     }
+
+    @PostMapping("/submit/{token}")
+    public ResponseEntity<Map<String, Object>> submit(@PathVariable String token, @RequestBody(required = false) Map<String, Object> submitData) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            PublishedForm updated = publishedFormService.incrementSubmitCount(token);
+            result.put("success", true);
+            result.put("data", updated);
+        } catch (Exception e) {
+            result.put("success", false);
+            result.put("message", e.getMessage());
+        }
+        return ResponseEntity.ok(result);
+    }
 }

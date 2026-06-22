@@ -250,7 +250,13 @@ async function handleSubmit() {
 
   submitting.value = true
   try {
-    await new Promise(resolve => setTimeout(resolve, 500))
+    const res = await axios.post(`/api/published-forms/submit/${props.token}`, {
+      formData: { ...formData }
+    })
+    if (!res.data.success) {
+      message.error(res.data.message || '提交失败')
+      return
+    }
     message.success('提交成功！感谢您的填写')
     submitted.value = false
     Object.keys(touchedFields).forEach(key => {

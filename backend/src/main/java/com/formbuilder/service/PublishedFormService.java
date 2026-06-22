@@ -68,4 +68,17 @@ public class PublishedFormService {
     public void deleteById(Long id) {
         publishedFormRepository.deleteById(id);
     }
+
+    public PublishedForm incrementSubmitCount(String token) {
+        Optional<PublishedForm> opt = publishedFormRepository.findByToken(token);
+        if (!opt.isPresent()) {
+            throw new RuntimeException("表单不存在");
+        }
+        PublishedForm publishedForm = opt.get();
+        if (!"PUBLISHED".equals(publishedForm.getStatus())) {
+            throw new RuntimeException("表单已下线");
+        }
+        publishedForm.setSubmitCount((publishedForm.getSubmitCount() == null ? 0 : publishedForm.getSubmitCount()) + 1);
+        return publishedFormRepository.save(publishedForm);
+    }
 }
