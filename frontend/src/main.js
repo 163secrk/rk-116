@@ -26,7 +26,11 @@ import {
   NEmpty,
   NSpin,
   NMenu,
-  NDivider
+  NDivider,
+  NTag,
+  NDataTable,
+  NRate,
+  NUpload
 } from 'naive-ui'
 import App from './App.vue'
 
@@ -57,7 +61,11 @@ const naive = create({
     NEmpty,
     NSpin,
     NMenu,
-    NDivider
+    NDivider,
+    NTag,
+    NDataTable,
+    NRate,
+    NUpload
   ]
 })
 

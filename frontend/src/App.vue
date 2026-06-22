@@ -1,5 +1,6 @@
 <template>
-  <n-config-provider :theme="darkTheme" :theme-overrides="themeOverrides">
+  <FormFillPage v-if="isFillPage" :token="fillToken" />
+  <n-config-provider v-else :theme="darkTheme" :theme-overrides="themeOverrides">
     <n-message-provider>
       <n-dialog-provider>
         <n-global-style />
@@ -16,6 +17,30 @@
                 size="small"
               />
               <n-space>
+                <n-tag
+                  v-if="publishStatus"
+                  type="success"
+                  size="small"
+                  round
+                  style="margin-right: 8px"
+                >
+                  <template #icon>
+                    <n-icon><CloudDoneOutline /></n-icon>
+                  </template>
+                  已发布
+                </n-tag>
+                <n-tag
+                  v-else
+                  type="default"
+                  size="small"
+                  round
+                  style="margin-right: 8px; opacity: 0.7"
+                >
+                  <template #icon>
+                    <n-icon><CloudOutline /></n-icon>
+                  </template>
+                  未发布
+                </n-tag>
                 <n-button type="primary" size="small" @click="showPreview = true">
                   <template #icon>
                     <n-icon><EyeOutline /></n-icon>
@@ -33,6 +58,17 @@
                     <n-icon><DuplicateOutline /></n-icon>
                   </template>
                   另存为
+                </n-button>
+                <n-button
+                  type="warning"
+                  size="small"
+                  :loading="publishing"
+                  @click="handlePublish"
+                >
+                  <template #icon>
+                    <n-icon><RocketOutline /></n-icon>
+                  </template>
+                  {{ publishStatus ? '重新发布' : '发布' }}
                 </n-button>
               </n-space>
             </div>
@@ -53,6 +89,13 @@
               >
                 <n-icon size="20"><DocumentsOutline /></n-icon>
                 <span>我的模板</span>
+              </div>
+              <div
+                :class="['menu-item', { active: currentPage === 'published' }]"
+                @click="switchToPublished"
+              >
+                <n-icon size="20"><RocketOutline /></n-icon>
+                <span>已发布表单</span>
               </div>
             </aside>
 
@@ -80,6 +123,11 @@
               @edit-template="handleEditTemplate"
               @create-new="handleCreateNewTemplate"
             />
+
+            <PublishedForms
+              v-if="currentPage === 'published'"
+              ref="publishedFormsRef"
+            />
           </div>
 
           <PreviewModal
@@ -104,6 +152,33 @@
               @keyup.enter="handleSaveAsConfirm"
             />
           </n-modal>
+
+          <n-modal
+            v-model:show="showPublishSuccessModal"
+            preset="card"
+            title="发布成功"
+            style="width: 520px"
+          >
+            <div class="publish-success-content">
+              <div class="publish-success-tip">表单已发布，您可以通过以下链接分享给他人填写：</div>
+              <div class="share-link-wrap">
+                <n-input :value="shareLink" readonly size="large" />
+                <n-button type="primary" size="large" @click="copyShareLink">
+                  <template #icon>
+                    <n-icon><CopyOutline /></n-icon>
+                  </template>
+                  复制链接
+                </n-button>
+              </div>
+            </div>
+            <template #footer>
+              <div style="text-align: right">
+                <n-button type="primary" @click="showPublishSuccessModal = false">
+                  确定
+                </n-button>
+              </div>
+            </template>
+          </n-modal>
         </div>
       </n-dialog-provider>
     </n-message-provider>
@@ -111,14 +186,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import {
-  NConfigProvider, NGlobalStyle, NButton, NSpace, NInput, NIcon,
+  NConfigProvider, NGlobalStyle, NButton, NSpace, NInput, NIcon, NTag,
   NMessageProvider, NDialogProvider, NModal, createDiscreteApi
 } from 'naive-ui'
 import { darkTheme } from 'naive-ui'
 import {
-  EyeOutline, SaveOutline, DuplicateOutline, BuildOutline, DocumentsOutline
+  EyeOutline, SaveOutline, DuplicateOutline, BuildOutline, DocumentsOutline,
+  RocketOutline, CloudDoneOutline, CloudOutline, CopyOutline
 } from '@vicons/ionicons5'
 import axios from 'axios'
 import ComponentPanel from './components/ComponentPanel.vue'
@@ -126,11 +202,14 @@ import FormCanvas from './components/FormCanvas.vue'
 import PropertyPanel from './components/PropertyPanel.vue'
 import PreviewModal from './components/PreviewModal.vue'
 import TemplateManager from './components/TemplateManager.vue'
+import PublishedForms from './components/PublishedForms.vue'
+import FormFillPage from './components/FormFillPage.vue'
 
 const { message } = createDiscreteApi(['message'])
 
 const currentPage = ref('builder')
 const templateManagerRef = ref(null)
+const publishedFormsRef = ref(null)
 
 const formName = ref('未命名表单')
 const schemaList = ref([])
@@ -140,6 +219,17 @@ const currentTemplateId = ref(null)
 
 const showSaveAsModal = ref(false)
 const newTemplateName = ref('')
+
+const publishStatus = ref(null)
+const publishing = ref(false)
+const shareLink = ref('')
+const showPublishSuccessModal = ref(false)
+
+const isFillPage = computed(() => window.location.hash.startsWith('#/fill/'))
+const fillToken = computed(() => {
+  const match = window.location.hash.match(/#\/fill\/(.+)/)
+  return match ? match[1] : ''
+})
 
 const themeOverrides = {
   common: {
@@ -296,6 +386,9 @@ async function handleSave() {
       if (templateManagerRef.value) {
         templateManagerRef.value.loadTemplates()
       }
+      if (currentTemplateId.value) {
+        checkPublishStatus()
+      }
     } else {
       message.error('保存失败')
     }
@@ -329,12 +422,81 @@ async function handleSaveAsConfirm() {
       if (templateManagerRef.value) {
         templateManagerRef.value.loadTemplates()
       }
+      checkPublishStatus()
     } else {
       message.error('保存失败')
     }
   } catch (e) {
     message.error('保存失败：' + e.message)
   }
+}
+
+async function handlePublish() {
+  if (schemaList.value.length === 0) {
+    message.warning('请先添加表单组件')
+    return
+  }
+  if (!currentTemplateId.value) {
+    message.info('请先保存表单')
+    await handleSave()
+    if (!currentTemplateId.value) return
+  }
+  publishing.value = true
+  try {
+    const payload = {
+      name: formName.value,
+      schemaData: JSON.stringify(schemaList.value)
+    }
+    await axios.put(`/api/forms/${currentTemplateId.value}`, payload)
+
+    const res = await axios.post(`/api/published-forms/publish/${currentTemplateId.value}`)
+    if (res.data.success) {
+      publishStatus.value = res.data.data
+      shareLink.value = `${window.location.origin}${window.location.pathname}#/fill/${res.data.data.token}`
+      showPublishSuccessModal.value = true
+      if (publishedFormsRef.value) {
+        publishedFormsRef.value.loadPublishedForms()
+      }
+    } else {
+      message.error(res.data.message || '发布失败')
+    }
+  } catch (e) {
+    message.error('发布失败：' + e.message)
+  } finally {
+    publishing.value = false
+  }
+}
+
+async function checkPublishStatus() {
+  if (!currentTemplateId.value) {
+    publishStatus.value = null
+    return
+  }
+  try {
+    const res = await axios.get(`/api/published-forms/status/${currentTemplateId.value}`)
+    if (res.data.success) {
+      publishStatus.value = res.data.data
+    } else {
+      publishStatus.value = null
+    }
+  } catch (e) {
+    publishStatus.value = null
+  }
+}
+
+function copyShareLink() {
+  if (!shareLink.value) return
+  navigator.clipboard.writeText(shareLink.value).then(() => {
+    message.success('链接已复制')
+  }).catch(() => {
+    const textarea = document.createElement('textarea')
+    textarea.value = shareLink.value
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+    message.success('链接已复制')
+  })
 }
 
 function ensureValidation(item) {
@@ -407,6 +569,13 @@ function switchToTemplates() {
   }
 }
 
+function switchToPublished() {
+  currentPage.value = 'published'
+  if (publishedFormsRef.value) {
+    publishedFormsRef.value.loadPublishedForms()
+  }
+}
+
 function handleEditTemplate(template) {
   formName.value = template.name
   currentTemplateId.value = template.id
@@ -417,6 +586,7 @@ function handleEditTemplate(template) {
   } catch (e) {
     schemaList.value = []
   }
+  checkPublishStatus()
   currentPage.value = 'builder'
   message.success('已加载模板：' + template.name)
 }
@@ -426,8 +596,13 @@ function handleCreateNewTemplate() {
   schemaList.value = []
   selectedId.value = null
   currentTemplateId.value = null
+  publishStatus.value = null
   currentPage.value = 'builder'
 }
+
+watch(currentTemplateId, () => {
+  checkPublishStatus()
+})
 
 onMounted(async () => {
   try {
@@ -442,6 +617,7 @@ onMounted(async () => {
       } catch (e) {
         schemaList.value = []
       }
+      checkPublishStatus()
     }
   } catch (e) {
     console.log('加载表单失败')
@@ -545,5 +721,20 @@ body {
   flex: 1;
   display: flex;
   overflow: hidden;
+}
+
+.publish-success-content {
+  padding: 8px 0;
+}
+
+.publish-success-tip {
+  font-size: 14px;
+  color: #334155;
+  margin-bottom: 16px;
+}
+
+.share-link-wrap {
+  display: flex;
+  gap: 8px;
 }
 </style>
