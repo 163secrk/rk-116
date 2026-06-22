@@ -70,6 +70,12 @@
                   </template>
                   {{ publishStatus ? '重新发布' : '发布' }}
                 </n-button>
+                <n-button size="small" @click="showPublishSettings = true">
+                  <template #icon>
+                    <n-icon><SettingsOutline /></n-icon>
+                  </template>
+                  发布设置
+                </n-button>
               </n-space>
             </div>
           </header>
@@ -179,6 +185,63 @@
               </div>
             </template>
           </n-modal>
+
+          <n-drawer v-model:show="showPublishSettings" placement="right" :width="440">
+            <n-drawer-content title="发布设置" :closable="true">
+              <n-form label-placement="left" label-width="130">
+                <n-form-item label="提交截止时间">
+                  <n-date-picker
+                    v-model:value="publishSettings.deadline"
+                    type="datetime"
+                    clearable
+                    placeholder="选择截止时间（不填则不限制）"
+                    style="width: 100%"
+                    format="yyyy-MM-dd HH:mm"
+                    value-format="yyyy-MM-dd HH:mm:ss"
+                  />
+                </n-form-item>
+                <n-form-item label="每人提交次数">
+                  <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <n-radio-group v-model:value="publishSettings.submitLimitType">
+                      <n-space vertical>
+                        <n-radio value="unlimited">不限</n-radio>
+                        <n-radio value="once">1次</n-radio>
+                        <n-radio value="custom">
+                          <span style="display: inline-flex; align-items: center; gap: 8px;">
+                            N次
+                            <n-input-number
+                              v-model:value="publishSettings.customLimit"
+                              :min="1"
+                              :max="9999"
+                              size="small"
+                              :disabled="publishSettings.submitLimitType !== 'custom'"
+                              placeholder="次数"
+                            />
+                          </span>
+                        </n-radio>
+                      </n-space>
+                    </n-radio-group>
+                  </div>
+                </n-form-item>
+                <n-form-item label="访问密码">
+                  <n-input
+                    v-model:value="publishSettings.accessPassword"
+                    type="password"
+                    show-password-on="click"
+                    maxlength="50"
+                    placeholder="选填，填写后访问需要输入密码"
+                    clearable
+                  />
+                </n-form-item>
+              </n-form>
+              <template #footer>
+                <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                  <n-button @click="showPublishSettings = false">取消</n-button>
+                  <n-button type="primary" @click="savePublishSettings">保存设置</n-button>
+                </div>
+              </template>
+            </n-drawer-content>
+          </n-drawer>
         </div>
       </n-dialog-provider>
     </n-message-provider>
@@ -186,15 +249,17 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, reactive } from 'vue'
 import {
   NConfigProvider, NGlobalStyle, NButton, NSpace, NInput, NIcon, NTag,
-  NMessageProvider, NDialogProvider, NModal, createDiscreteApi
+  NMessageProvider, NDialogProvider, NModal, NDrawer, NDrawerContent,
+  NForm, NFormItem, NDatePicker, NRadioGroup, NRadio, NInputNumber,
+  createDiscreteApi
 } from 'naive-ui'
 import { darkTheme } from 'naive-ui'
 import {
   EyeOutline, SaveOutline, DuplicateOutline, BuildOutline, DocumentsOutline,
-  RocketOutline, CloudDoneOutline, CloudOutline, CopyOutline
+  RocketOutline, CloudDoneOutline, CloudOutline, CopyOutline, SettingsOutline
 } from '@vicons/ionicons5'
 import axios from 'axios'
 import ComponentPanel from './components/ComponentPanel.vue'
@@ -224,6 +289,13 @@ const publishStatus = ref(null)
 const publishing = ref(false)
 const shareLink = ref('')
 const showPublishSuccessModal = ref(false)
+const showPublishSettings = ref(false)
+const publishSettings = reactive({
+  deadline: null,
+  submitLimitType: 'unlimited',
+  customLimit: 1,
+  accessPassword: ''
+})
 
 const isFillPage = computed(() => window.location.hash.startsWith('#/fill/'))
 const fillToken = computed(() => {
@@ -431,6 +503,53 @@ async function handleSaveAsConfirm() {
   }
 }
 
+function buildPublishSettingsPayload() {
+  const settings = {}
+  if (publishSettings.deadline) {
+    settings.deadline = publishSettings.deadline
+  }
+  if (publishSettings.submitLimitType === 'once') {
+    settings.maxSubmissionsPerPerson = 1
+  } else if (publishSettings.submitLimitType === 'custom' && publishSettings.customLimit > 0) {
+    settings.maxSubmissionsPerPerson = publishSettings.customLimit
+  }
+  if (publishSettings.accessPassword && publishSettings.accessPassword.trim()) {
+    settings.accessPassword = publishSettings.accessPassword.trim()
+  }
+  return settings
+}
+
+function loadSettingsFromPublishStatus(status) {
+  if (!status) {
+    publishSettings.deadline = null
+    publishSettings.submitLimitType = 'unlimited'
+    publishSettings.customLimit = 1
+    publishSettings.accessPassword = ''
+    return
+  }
+  if (status.deadline) {
+    const d = new Date(status.deadline)
+    if (!isNaN(d.getTime())) {
+      publishSettings.deadline = status.deadline
+    } else {
+      publishSettings.deadline = null
+    }
+  } else {
+    publishSettings.deadline = null
+  }
+  if (status.maxSubmissionsPerPerson != null && status.maxSubmissionsPerPerson > 0) {
+    if (status.maxSubmissionsPerPerson === 1) {
+      publishSettings.submitLimitType = 'once'
+    } else {
+      publishSettings.submitLimitType = 'custom'
+      publishSettings.customLimit = status.maxSubmissionsPerPerson
+    }
+  } else {
+    publishSettings.submitLimitType = 'unlimited'
+  }
+  publishSettings.accessPassword = status.accessPassword || ''
+}
+
 async function handlePublish() {
   if (schemaList.value.length === 0) {
     message.warning('请先添加表单组件')
@@ -449,7 +568,8 @@ async function handlePublish() {
     }
     await axios.put(`/api/forms/${currentTemplateId.value}`, payload)
 
-    const res = await axios.post(`/api/published-forms/publish/${currentTemplateId.value}`)
+    const settings = buildPublishSettingsPayload()
+    const res = await axios.post(`/api/published-forms/publish/${currentTemplateId.value}`, { settings })
     if (res.data.success) {
       publishStatus.value = res.data.data
       shareLink.value = `${window.location.origin}${window.location.pathname}#/fill/${res.data.data.token}`
@@ -467,20 +587,29 @@ async function handlePublish() {
   }
 }
 
+function savePublishSettings() {
+  message.success('发布设置已保存')
+  showPublishSettings.value = false
+}
+
 async function checkPublishStatus() {
   if (!currentTemplateId.value) {
     publishStatus.value = null
+    loadSettingsFromPublishStatus(null)
     return
   }
   try {
     const res = await axios.get(`/api/published-forms/status/${currentTemplateId.value}`)
     if (res.data.success) {
       publishStatus.value = res.data.data
+      loadSettingsFromPublishStatus(res.data.data)
     } else {
       publishStatus.value = null
+      loadSettingsFromPublishStatus(null)
     }
   } catch (e) {
     publishStatus.value = null
+    loadSettingsFromPublishStatus(null)
   }
 }
 

@@ -34,6 +34,15 @@ public class PublishedForm {
     @Column(name = "submit_count")
     private Integer submitCount = 0;
 
+    @Column(name = "deadline")
+    private LocalDateTime deadline;
+
+    @Column(name = "max_submissions_per_person")
+    private Integer maxSubmissionsPerPerson;
+
+    @Column(name = "access_password", length = 100)
+    private String accessPassword;
+
     @PrePersist
     protected void onCreate() {
         publishedAt = LocalDateTime.now();

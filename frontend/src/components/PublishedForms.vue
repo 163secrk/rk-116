@@ -109,6 +109,26 @@ async function confirmOffline() {
   }
 }
 
+function formatLimitInfo(row) {
+  const items = []
+  if (row.deadline) {
+    items.push('截止：' + formatTime(row.deadline))
+  } else {
+    items.push('截止：不限')
+  }
+  if (row.maxSubmissionsPerPerson != null && row.maxSubmissionsPerPerson > 0) {
+    items.push('每人限' + row.maxSubmissionsPerPerson + '次')
+  } else {
+    items.push('每人不限次')
+  }
+  if (row.accessPassword) {
+    items.push('需密码')
+  } else {
+    items.push('无密码')
+  }
+  return items
+}
+
 const columns = [
   {
     title: '表单名',
@@ -135,21 +155,32 @@ const columns = [
       ])
   },
   {
+    title: '限制设置',
+    key: 'limitInfo',
+    width: 280,
+    render: (row) => {
+      const items = formatLimitInfo(row)
+      return h('div', { style: 'display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #94a3b8; line-height: 1.4' },
+        items.map(item => h('div', null, item))
+      )
+    }
+  },
+  {
     title: '发布时间',
     key: 'publishedAt',
-    width: 180,
+    width: 160,
     render: (row) => h('span', { style: 'color: #94a3b8; font-size: 13px' }, formatTime(row.publishedAt))
   },
   {
     title: '填写次数',
     key: 'submitCount',
-    width: 100,
+    width: 90,
     render: (row) => h('span', { style: 'color: #cbd5e1' }, row.submitCount || 0)
   },
   {
     title: '状态',
     key: 'status',
-    width: 100,
+    width: 90,
     render: (row) =>
       h(NTag, {
         type: row.status === 'PUBLISHED' ? 'success' : 'default',
@@ -160,7 +191,7 @@ const columns = [
   {
     title: '操作',
     key: 'action',
-    width: 180,
+    width: 160,
     render: (row) =>
       h(NSpace, null, {
         default: () => [

@@ -9,13 +9,43 @@
       <p class="error-text">{{ error }}</p>
     </div>
 
+    <div v-else-if="needPassword && !passwordVerified" class="fill-container">
+      <div class="form-header">
+        <h1 class="form-title">{{ formName }}</h1>
+        <p class="form-desc">该表单需要访问密码，请输入后继续</p>
+      </div>
+      <div class="form-body">
+        <n-form label-placement="left" label-width="100px">
+          <n-form-item label="访问密码">
+            <n-input
+              v-model:value="inputPassword"
+              type="password"
+              show-password-on="mousedown"
+              placeholder="请输入访问密码"
+              size="large"
+              @keyup.enter="verifyPassword"
+            />
+          </n-form-item>
+        </n-form>
+      </div>
+      <div class="form-footer">
+        <n-button type="primary" size="large" :loading="verifyingPassword" @click="verifyPassword">
+          确认
+        </n-button>
+      </div>
+    </div>
+
     <div v-else class="fill-container">
       <div class="form-header">
         <h1 class="form-title">{{ formName }}</h1>
         <p v-if="schemaList.length === 0" class="form-desc">该表单暂无内容</p>
+        <div v-if="submissionLimitInfo" class="limit-info">
+          <n-icon size="16" color="#f59e0b"><AlertCircleOutline /></n-icon>
+          <span>{{ submissionLimitInfo }}</span>
+        </div>
       </div>
 
-      <div v-if="schemaList.length > 0" class="form-body">
+      <div v-if="schemaList.length > 0 && !reachedSubmitLimit" class="form-body">
         <div class="form-list">
           <PreviewItem
             v-for="comp in schemaList"
@@ -33,7 +63,13 @@
         </div>
       </div>
 
-      <div v-if="schemaList.length > 0" class="form-footer">
+      <div v-else-if="reachedSubmitLimit" class="limit-reached-wrap">
+        <n-icon size="48" color="#f59e0b"><AlertCircleOutline /></n-icon>
+        <p class="limit-reached-text">已达上限</p>
+        <p class="limit-reached-desc">您已达到该表单的提交次数限制</p>
+      </div>
+
+      <div v-if="schemaList.length > 0 && !reachedSubmitLimit" class="form-footer">
         <n-button type="primary" size="large" :loading="submitting" @click="handleSubmit">
           提交
         </n-button>
@@ -43,8 +79,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { NButton, NSpin, NIcon, createDiscreteApi } from 'naive-ui'
+import { ref, reactive, onMounted, computed } from 'vue'
+import { NButton, NSpin, NIcon, NForm, NFormItem, NInput, createDiscreteApi } from 'naive-ui'
 import { AlertCircleOutline } from '@vicons/ionicons5'
 import axios from 'axios'
 import PreviewItem from './PreviewItem.vue'
@@ -66,10 +102,60 @@ const schemaList = ref([])
 const submitted = ref(false)
 const submitting = ref(false)
 
+const needPassword = ref(false)
+const passwordVerified = ref(false)
+const inputPassword = ref('')
+const verifyingPassword = ref(false)
+const publishedFormData = ref(null)
+const visitorSubmitCount = ref(0)
+
 const formData = reactive({})
 const fieldErrors = reactive({})
 const touchedFields = reactive({})
 const uploadFileLists = reactive({})
+
+const VISITOR_ID_KEY = 'form_visitor_id'
+
+function getOrCreateVisitorId() {
+  let vid = localStorage.getItem(VISITOR_ID_KEY)
+  if (!vid) {
+    vid = 'v_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9)
+    localStorage.setItem(VISITOR_ID_KEY, vid)
+  }
+  return vid
+}
+
+const visitorId = getOrCreateVisitorId()
+
+axios.interceptors.request.use(config => {
+  config.headers['X-Visitor-Id'] = visitorId
+  return config
+})
+
+const reachedSubmitLimit = computed(() => {
+  if (!publishedFormData.value || publishedFormData.value.maxSubmissionsPerPerson == null || publishedFormData.value.maxSubmissionsPerPerson <= 0) {
+    return false
+  }
+  return visitorSubmitCount.value >= publishedFormData.value.maxSubmissionsPerPerson
+})
+
+const submissionLimitInfo = computed(() => {
+  const infos = []
+  if (publishedFormData.value) {
+    const pf = publishedFormData.value
+    if (pf.deadline) {
+      const d = new Date(pf.deadline)
+      if (!isNaN(d.getTime())) {
+        const pad = (n) => n.toString().padStart(2, '0')
+        infos.push('截止时间：' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()))
+      }
+    }
+    if (pf.maxSubmissionsPerPerson != null && pf.maxSubmissionsPerPerson > 0) {
+      infos.push('已提交 ' + visitorSubmitCount.value + '/' + pf.maxSubmissionsPerPerson + ' 次')
+    }
+  }
+  return infos.join('  |  ')
+})
 
 function collectFields(list) {
   const fields = []
@@ -231,6 +317,24 @@ function handleBeforeUpload(comp, data) {
   return true
 }
 
+async function verifyPassword() {
+  if (!inputPassword.value || !inputPassword.value.trim()) {
+    message.warning('请输入访问密码')
+    return
+  }
+  verifyingPassword.value = true
+  try {
+    if (publishedFormData.value && publishedFormData.value.accessPassword === inputPassword.value.trim()) {
+      passwordVerified.value = true
+      message.success('验证通过')
+    } else {
+      message.error('密码错误')
+    }
+  } finally {
+    verifyingPassword.value = false
+  }
+}
+
 async function handleSubmit() {
   submitted.value = true
   validateAllFields()
@@ -257,13 +361,18 @@ async function handleSubmit() {
       message.error(res.data.message || '提交失败')
       return
     }
+    visitorSubmitCount.value += 1
     message.success('提交成功！感谢您的填写')
     submitted.value = false
     Object.keys(touchedFields).forEach(key => {
       touchedFields[key] = false
     })
   } catch (e) {
-    message.error('提交失败：' + e.message)
+    if (e.response && e.response.data && e.response.data.message) {
+      message.error(e.response.data.message)
+    } else {
+      message.error('提交失败：' + e.message)
+    }
   } finally {
     submitting.value = false
   }
@@ -278,8 +387,13 @@ async function loadForm() {
       error.value = res.data.message || '加载失败'
       return
     }
-    const { publishedForm, formSchema } = res.data.data
+    const { publishedForm, formSchema, visitorSubmitCount: vsc } = res.data.data
+    publishedFormData.value = publishedForm
     formName.value = publishedForm.formName || formSchema.name
+    visitorSubmitCount.value = vsc || 0
+    if (publishedForm.accessPassword && publishedForm.accessPassword.trim()) {
+      needPassword.value = true
+    }
     try {
       const list = JSON.parse(formSchema.schemaData) || []
       schemaList.value = list.map(item => ensureValidation(item))
@@ -337,6 +451,19 @@ onMounted(() => {
   margin-top: 8px;
 }
 
+.limit-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #92400e;
+}
+
 .form-body {
   padding: 24px 32px;
 }
@@ -375,5 +502,28 @@ onMounted(() => {
 .error-text {
   font-size: 16px;
   color: #64748b;
+}
+
+.limit-reached-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 32px;
+  gap: 12px;
+  text-align: center;
+}
+
+.limit-reached-text {
+  font-size: 20px;
+  font-weight: 600;
+  color: #92400e;
+  margin: 0;
+}
+
+.limit-reached-desc {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0;
 }
 </style>
