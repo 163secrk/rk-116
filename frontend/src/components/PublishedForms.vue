@@ -25,58 +25,7 @@
       bordered
       striped
       size="small"
-    >
-      <template #body="{ row }">
-        <tr>
-          <td class="col-name">{{ row.formName }}</td>
-          <td class="col-link">
-            <div class="link-wrap">
-              <span class="link-text">{{ getShareLink(row.token) }}</span>
-              <n-button text size="tiny" @click="copyLink(row.token)">
-                <template #icon>
-                  <n-icon><CopyOutline /></n-icon>
-                </template>
-                复制
-              </n-button>
-            </div>
-          </td>
-          <td class="col-time">{{ formatTime(row.publishedAt) }}</td>
-          <td class="col-count">{{ row.submitCount || 0 }}</td>
-          <td class="col-status">
-            <n-tag :type="row.status === 'PUBLISHED' ? 'success' : 'default'" size="small" round>
-              {{ row.status === 'PUBLISHED' ? '已发布' : '已下线' }}
-            </n-tag>
-          </td>
-          <td class="col-action">
-            <n-space>
-              <n-button
-                text
-                type="primary"
-                size="tiny"
-                @click="openLink(row.token)"
-              >
-                <template #icon>
-                  <n-icon><OpenOutline /></n-icon>
-                </template>
-                打开
-              </n-button>
-              <n-button
-                v-if="row.status === 'PUBLISHED'"
-                text
-                type="warning"
-                size="tiny"
-                @click="handleOffline(row)"
-              >
-                <template #icon>
-                  <n-icon><CloudOfflineOutline /></n-icon>
-                </template>
-                下线
-              </n-button>
-            </n-space>
-          </td>
-        </tr>
-      </template>
-    </n-data-table>
+    />
 
     <n-modal v-model:show="showOfflineModal" preset="dialog" title="下线确认" positive-text="确认下线" negative-text="取消" type="warning" @positive-click="confirmOffline">
       <div>确定要下线此表单吗？下线后用户将无法通过链接访问该表单。</div>
@@ -85,7 +34,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, h } from 'vue'
 import {
   NButton, NIcon, NSpin, NEmpty, NDataTable, NSpace, NTag, NModal, createDiscreteApi
 } from 'naive-ui'
@@ -105,15 +54,6 @@ const pagination = {
   pageSize: 10
 }
 
-const columns = [
-  { title: '表单名', key: 'formName', width: 200 },
-  { title: '分享链接', key: 'token', width: 320 },
-  { title: '发布时间', key: 'publishedAt', width: 180 },
-  { title: '填写次数', key: 'submitCount', width: 100 },
-  { title: '状态', key: 'status', width: 100 },
-  { title: '操作', key: 'action', width: 160 }
-]
-
 function getShareLink(token) {
   return `${window.location.origin}${window.location.pathname}#/fill/${token}`
 }
@@ -124,22 +64,6 @@ function formatTime(time) {
   if (isNaN(d.getTime())) return time
   const pad = (n) => n.toString().padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
-async function loadPublishedForms() {
-  loading.value = true
-  try {
-    const res = await axios.get('/api/published-forms')
-    if (res.data.success) {
-      publishedForms.value = res.data.data || []
-    } else {
-      message.error(res.data.message || '加载失败')
-    }
-  } catch (e) {
-    message.error('加载失败：' + e.message)
-  } finally {
-    loading.value = false
-  }
 }
 
 async function copyLink(token) {
@@ -185,6 +109,98 @@ async function confirmOffline() {
   }
 }
 
+const columns = [
+  {
+    title: '表单名',
+    key: 'formName',
+    width: 200,
+    render: (row) => h('span', { style: 'color: #e2e8f0; font-weight: 500' }, row.formName)
+  },
+  {
+    title: '分享链接',
+    key: 'token',
+    width: 340,
+    render: (row) =>
+      h('div', { style: 'display: flex; align-items: center; gap: 8px' }, [
+        h('span', {
+          style: 'color: #94a3b8; font-size: 12px; font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 240px',
+          title: getShareLink(row.token)
+        }, getShareLink(row.token)),
+        h(NButton, {
+          text: true, size: 'tiny', onClick: () => copyLink(row.token)
+        }, {
+          icon: () => h(NIcon, null, { default: () => h(CopyOutline) }),
+          default: () => '复制'
+        })
+      ])
+  },
+  {
+    title: '发布时间',
+    key: 'publishedAt',
+    width: 180,
+    render: (row) => h('span', { style: 'color: #94a3b8; font-size: 13px' }, formatTime(row.publishedAt))
+  },
+  {
+    title: '填写次数',
+    key: 'submitCount',
+    width: 100,
+    render: (row) => h('span', { style: 'color: #cbd5e1' }, row.submitCount || 0)
+  },
+  {
+    title: '状态',
+    key: 'status',
+    width: 100,
+    render: (row) =>
+      h(NTag, {
+        type: row.status === 'PUBLISHED' ? 'success' : 'default',
+        size: 'small',
+        round: true
+      }, { default: () => row.status === 'PUBLISHED' ? '已发布' : '已下线' })
+  },
+  {
+    title: '操作',
+    key: 'action',
+    width: 180,
+    render: (row) =>
+      h(NSpace, null, {
+        default: () => [
+          h(NButton, {
+            text: true, type: 'primary', size: 'tiny',
+            onClick: () => openLink(row.token)
+          }, {
+            icon: () => h(NIcon, null, { default: () => h(OpenOutline) }),
+            default: () => '打开'
+          }),
+          row.status === 'PUBLISHED'
+            ? h(NButton, {
+                text: true, type: 'warning', size: 'tiny',
+                onClick: () => handleOffline(row)
+              }, {
+                icon: () => h(NIcon, null, { default: () => h(CloudOfflineOutline) }),
+                default: () => '下线'
+              })
+            : null
+        ]
+      })
+  }
+]
+
+async function loadPublishedForms() {
+  loading.value = true
+  try {
+    const res = await axios.get('/api/published-forms')
+    if (res.data.success) {
+      publishedForms.value = res.data.data || []
+    } else {
+      message.error(res.data.message || '加载失败')
+    }
+  } catch (e) {
+    message.error('加载失败：' + e.message)
+  } finally {
+    loading.value = false
+  }
+}
+
 onMounted(() => {
   loadPublishedForms()
 })
@@ -218,40 +234,5 @@ defineExpose({ loadPublishedForms })
   display: flex;
   justify-content: center;
   padding: 80px 0;
-}
-
-.link-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.link-text {
-  flex: 1;
-  color: #94a3b8;
-  font-size: 12px;
-  font-family: monospace;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 240px;
-}
-
-.col-name {
-  color: #e2e8f0;
-  font-weight: 500;
-}
-
-.col-link {
-  font-family: monospace;
-}
-
-.col-time {
-  color: #94a3b8;
-  font-size: 13px;
-}
-
-.col-count {
-  color: #cbd5e1;
 }
 </style>
